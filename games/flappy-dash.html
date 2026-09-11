@@ -1,0 +1,4095 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Flappy Dash</title>
+<style>
+  html,body{margin:0;height:100%;background:#12131c;overflow:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-user-select:none;user-select:none;}
+  #obal{position:fixed;inset:0;display:grid;place-items:center;}
+  canvas{background:#6fc3e8;max-width:100%;max-height:100%;
+    aspect-ratio:16/9;touch-action:none;display:block;border-radius:8px;}
+</style>
+</head>
+<body>
+<div id="obal"><canvas id="platno"></canvas></div>
+<script>
+// =====================================================================
+//  FLAPPY DASH — slepice v helmě
+//  Flappy létání + geometry dash překážky + turbo pírko + boss liška
+// =====================================================================
+
+// ============ ZÁKLAD ============
+const Š = 960, V = 540;
+const platno = document.getElementById('platno');
+const ctx = platno.getContext('2d');
+
+function zmenVelikost(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  platno.width  = Š * dpr;
+  platno.height = V * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+}
+addEventListener('resize', zmenVelikost);
+zmenVelikost();
+
+// ============ POMOCNÍCI ============
+const nah   = (a,b) => a + Math.random()*(b-a);
+const nahZ  = p => p[Math.floor(Math.random()*p.length)];
+const omez  = (v,a,b) => Math.max(a, Math.min(b, v));
+
+function emoji(znak, x, y, velikost=44, uhel=0, meritko=1){
+  ctx.save();
+  ctx.translate(x, y);
+  if (uhel) ctx.rotate(uhel);
+  if (meritko !== 1) ctx.scale(meritko, meritko);
+  ctx.globalAlpha = 1; ctx.fillStyle = '#fff';
+  ctx.font = velikost + 'px serif';
+  ctx.fillText(znak, 0, 0);
+  ctx.restore();
+}
+function kruhBox(kx, ky, kr, x, y, š, v){
+  const nx = omez(kx, x, x+š), ny = omez(ky, y, y+v);
+  return Math.hypot(kx-nx, ky-ny) < kr;
+}
+
+// ============ ZVUK ============
+const zvuk = (() => {
+  let a = null, zapnuto = true, hudbaTimer = null;
+  function audio(){
+    if (!a) a = new (window.AudioContext || window.webkitAudioContext)();
+    if (a.state === 'suspended') a.resume();
+    return a;
+  }
+  function ton({f=440, f2=null, t=.15, typ='square', hlas=.15, kdy=0} = {}){
+    if (!zapnuto) return;
+    const c = audio(), z = c.currentTime + kdy;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = typ;
+    o.frequency.setValueAtTime(f, z);
+    if (f2) o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), z + t);
+    g.gain.setValueAtTime(.0001, z);
+    g.gain.exponentialRampToValueAtTime(hlas, z + .01);
+    g.gain.exponentialRampToValueAtTime(.0001, z + t);
+    o.connect(g); g.connect(c.destination);
+    o.start(z); o.stop(z + t + .05);
+  }
+  function sum({t=.2, hlas=.2, filtr=1200, kdy=0} = {}){
+    if (!zapnuto) return;
+    const c = audio(), z = c.currentTime + kdy;
+    const n = Math.max(1, Math.floor(c.sampleRate * t));
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random()*2-1) * (1 - i/n);
+    const s = c.createBufferSource(); s.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filtr;
+    const g = c.createGain(); g.gain.value = hlas;
+    s.connect(f); f.connect(g); g.connect(c.destination);
+    s.start(z);
+  }
+  function nota(jmeno){
+    const z = {C:0, D:2, E:4, F:5, G:7, A:9, B:11, H:11};
+    const m = /^([A-H])(#|b)?(-?\d)$/.exec(jmeno);
+    if (!m) return 440;
+    const p = z[m[1]] + (m[2]==='#' ? 1 : m[2]==='b' ? -1 : 0) + (+m[3]+1)*12;
+    return 440 * Math.pow(2, (p - 69) / 12);
+  }
+  return {
+    ton, sum, nota,
+    get stav(){ return zapnuto; },
+    prepni(){ zapnuto = !zapnuto; if (!zapnuto) this.hudbaStop(); return zapnuto; },
+    mav:    () => { ton({f:nah(280,340), f2:nah(620,720), t:.09, typ:'square', hlas:.1});
+                    sum({t:.06, hlas:.06, filtr:1600}); },
+    kvok:   () => { ton({f:nah(750,900), f2:nah(420,520), t:.09, typ:'square', hlas:.1});
+                    ton({f:nah(520,640), t:.06, typ:'square', hlas:.08, kdy:.08}); },
+    bonus:  () => [784,988,1175,1568].forEach((f,i) =>
+                    ton({f, t:.13, typ:'square', hlas:.16, kdy:i*.06})),
+    bod:    () => { ton({f:880, t:.06, typ:'triangle', hlas:.14});
+                    ton({f:1320, t:.09, typ:'triangle', hlas:.11, kdy:.05}); },
+    zrno:   () => { ton({f:1046, t:.05, typ:'triangle', hlas:.16});
+                    ton({f:1568, t:.08, typ:'triangle', hlas:.13, kdy:.05}); },
+    tuk:    () => { ton({f:1400, f2:500, t:.12, typ:'square', hlas:.2});
+                    sum({t:.14, hlas:.14, filtr:2400}); },
+    pisk:   () => ton({f:1600, f2:900, t:.12, typ:'sawtooth', hlas:.1}),
+    turbo:  () => [523,659,784,1047,1319].forEach((f,i) =>
+                    ton({f, t:.12, typ:'square', hlas:.16, kdy:i*.05})),
+    bam:    () => { sum({t:.22, hlas:.24, filtr:900});
+                    ton({f:260, f2:70, t:.18, typ:'sawtooth', hlas:.16}); },
+    dash:   () => [784,1047,1319,1568].forEach((f,i) =>
+                    ton({f, t:.1, typ:'square', hlas:.16, kdy:i*.05})),
+    vejce:  () => ton({f:700, f2:260, t:.16, typ:'triangle', hlas:.1}),
+    plack:  () => sum({t:.16, hlas:.14, filtr:500}),
+    vyhraDuha: () => [523,659,784,1047,1319,1568].forEach((f,i) =>
+                    ton({f, t:.16, typ:'triangle', hlas:.14, kdy:i*.07})),
+    portal: (nahoru) => {
+      const n = nahoru ? [392,523,659,880,1175] : [1175,880,659,523,392];
+      n.forEach((f,i) => ton({f, t:.11, typ:'square', hlas:.15, kdy:i*.05}));
+      sum({t:.3, hlas:.12, filtr:1400});
+    },
+    vitr:   () => sum({t:1.5, hlas:.055, filtr:430}),
+    cvrcek: () => { ton({f:2400, t:.03, typ:'square', hlas:.045});
+                    ton({f:2400, t:.03, typ:'square', hlas:.045, kdy:.07}); },
+    ptacek: () => { ton({f:1750, f2:2400, t:.08, typ:'sine', hlas:.055});
+                    ton({f:2200, f2:1700, t:.07, typ:'sine', hlas:.045, kdy:.12}); },
+    hrom:   () => { sum({t:1.1, hlas:.3, filtr:190});
+                    ton({f:72, f2:38, t:.9, typ:'sine', hlas:.16}); },
+    motor:  () => { ton({f:110, f2:150, t:.5, typ:'sawtooth', hlas:.08});
+                    sum({t:.5, hlas:.06, filtr:300}); },
+    nabij:  () => { ton({f:300, f2:900, t:.13, typ:'square', hlas:.07});
+                    ton({f:600, f2:1200, t:.09, typ:'triangle', hlas:.05, kdy:.06}); },
+    pukanec:() => { sum({t:.05, hlas:.16, filtr:2400});
+                    ton({f:950, f2:380, t:.06, typ:'square', hlas:.1}); },
+    buben:  () => { ton({f:150, f2:52, t:.32, typ:'sine', hlas:.3});
+                    sum({t:.28, hlas:.2, filtr:420});
+                    ton({f:300, f2:120, t:.12, typ:'triangle', hlas:.1, kdy:.02}); },
+    pavouk: () => { ton({f:1500, f2:900, t:.05, typ:'square', hlas:.07});
+                    ton({f:1200, f2:700, t:.05, typ:'square', hlas:.06, kdy:.07});
+                    ton({f:1000, f2:600, t:.05, typ:'square', hlas:.05, kdy:.14}); },
+    ohen:   () => { sum({t:.45, hlas:.2, filtr:1500});
+                    ton({f:260, f2:900, t:.3, typ:'sawtooth', hlas:.09}); },
+    rez:    () => { ton({f:2200, f2:600, t:.14, typ:'sawtooth', hlas:.13});
+                    sum({t:.1, hlas:.1, filtr:2600}); },
+    bossAu: () => { sum({t:.45, hlas:.32, filtr:700});
+                    ton({f:180, f2:50, t:.4, typ:'sawtooth', hlas:.2});
+                    ton({f:900, f2:300, t:.25, typ:'square', hlas:.12, kdy:.05}); },
+    bossKonec: () => [392,523,659,784,1047].forEach((f,i) =>
+                    ton({f, t:.2, typ:'triangle', hlas:.18, kdy:i*.12})),
+    start:  () => [523,659,784].forEach((f,i) =>
+                    ton({f, t:.1, typ:'triangle', hlas:.15, kdy:i*.08})),
+    konec:  () => [784,659,523,392].forEach((f,i) =>
+                    ton({f, t:.24, typ:'triangle', hlas:.16, kdy:i*.15})),
+    hudbaHraj(noty, tempo = 120, typ = 'triangle', hlas = .04, bas = null, wob = false){
+      this.hudbaStop();
+      if (!zapnuto) return;
+      const krok = 60 / tempo / 2;
+      let i = 0;
+      hudbaTimer = setInterval(() => {
+        const n = noty[i % noty.length];
+        if (n) ton({ f: typeof n === 'string' ? nota(n) : n, t: krok*.9, typ, hlas });
+        if (bas){
+          const b = bas[i % bas.length];
+          if (b){
+            const fb = nota(b);
+            if (wob)                                        // vrčící „wobble" bas
+              ton({ f: fb * (i % 2 ? 1 : 2), f2: fb * .5, t: krok * 1.9,
+                    typ: 'sawtooth', hlas: hlas * 1.7 });
+            else
+              ton({ f: fb, t: krok * 1.7, typ: 'sawtooth', hlas: hlas * 1.15 });
+          }
+          if (i % 4 === 0) sum({ t: wob ? .09 : .05, hlas: wob ? .12 : .07, filtr: wob ? 190 : 260 });
+          if (i % 4 === 2) sum({ t: .07, hlas: .05, filtr: 3200 });
+          if (wob && i % 8 === 7) sum({ t: .13, hlas: .09, filtr: 5200 });   // rozjezd
+        }
+        i++;
+      }, krok * 1000);
+    },
+    hudbaStop(){ if (hudbaTimer) { clearInterval(hudbaTimer); hudbaTimer = null; } }
+  };
+})();
+
+let hudbaRezim = '';
+function rezimHudby(){
+  if (boss) return 'boss';
+  if (bourka > 0) return 'bourka';
+  if (zrychleniCas > 0) return 'rychlo';
+  if (demonSila() > .45) return 'demon';
+  if (nocSila() > .5) return 'noc';
+  return 'den';
+}
+function hudbaTed(){
+  hudbaRezim = rezimHudby();
+  if (hudbaRezim === 'boss')        zvuk.hudbaHraj(HUDBA_BOSS, 140, 'square', .045);
+  else if (hudbaRezim === 'bourka') zvuk.hudbaHraj(HUDBA_BOURKA, 116, 'triangle', .035);
+  else if (hudbaRezim === 'rychlo') zvuk.hudbaHraj(HUDBA_LET, 250, 'square', .045, BAS_LET);
+  else if (hudbaRezim === 'demon')  zvuk.hudbaHraj(HUDBA_DEMON, 212, 'square', .036, BAS_DEMON, true);
+  else if (hudbaRezim === 'noc')    zvuk.hudbaHraj(HUDBA_NOC, 98, 'sine', .04, BAS_NOC);
+  else                              zvuk.hudbaHraj(HUDBA_LET, 180, 'square', .045, BAS_LET);
+}
+// vlastní rychlá skladba ve stylu, co má rád — originál, nic okopírovaného
+const HUDBA_LET = [
+  'A4','C5','E5','C5','A4','C5','E5','G5',
+  'F4','A4','C5','A4','F4','A4','C5','E5',
+  'G4','H4','D5','H4','G4','H4','D5','F5',
+  'E4','G4','H4','G4','E4','H4','E5','D5'];
+const BAS_LET = [
+  'A2',null,'A2','A2','A2',null,'A2',null,
+  'F2',null,'F2','F2','F2',null,'F2',null,
+  'G2',null,'G2','G2','G2',null,'G2',null,
+  'E2',null,'E2','E2','E2',null,'E2','E2'];
+// noc — tiché a tajemné
+const HUDBA_NOC = ['A3',null,'C4',null,'E4',null,'D4',null,
+                   'F4',null,'E4',null,'C4',null,'A3',null];
+const BAS_NOC   = ['A1',null,null,null,'F1',null,null,null,
+                   'G1',null,null,null,'E1',null,null,null];
+// démonická oblast — vlastní temná skladba: vysoký strašidelný zpěv nad vrčícím basem
+const HUDBA_DEMON = [
+  'D5',null,'C5',null,'A#4',null,'C5',null,
+  'D5',null,'F5',null,'D#5',null,'C5',null,
+  'A#4',null,'G#4',null,'A#4',null,'C5',null,
+  'D5',null,null,null,'A#4',null,'G#4',null,
+  'F5',null,'D#5',null,'D5',null,'C5',null,
+  'A#4',null,'C5',null,'D#5',null,'D5',null];
+const BAS_DEMON = [
+  'D2','D2','D2','D2','D2','D2','D2','D2',
+  'D2','D2','A#1','A#1','C2','C2','C2','C2',
+  'G#1','G#1','G#1','G#1','A#1','A#1','A#1','A#1',
+  'D2','D2','D2','D2','C2','C2','A#1','A#1',
+  'A#1','A#1','A#1','A#1','G#1','G#1','G#1','G#1',
+  'F1','F1','F1','F1','D2','D2','D2','D2'];
+const HUDBA_BOURKA = ['A3',null,'C4',null,'A3',null,'G3',null];
+const HUDBA_BOSS = ['A3',null,'A3','C4','A3',null,'G3','A3',
+                    'F3',null,'F3','A3','G3',null,'E3',null];
+
+// ============ OVLÁDÁNÍ ============
+// ============ TESTOVACÍ (ADMIN) REŽIM ============
+const ADMIN_FAZE = [['Digit1', .04, 'DEN'], ['Digit2', .36, 'ZÁPAD SLUNCE'],
+                    ['Digit3', .54, 'NOC'], ['Digit4', .72, 'DÉMONICKÁ OBLAST']];
+const ADMIN_BOSS = [['Digit5', 'vlk'], ['Digit6', 'pavouk'], ['Digit7', 'kohout'], ['Digit8', 'liska']];
+
+function adminTeleport(cil, jmeno){
+  cyklPosun = cil * CYKLUS - (hodiny % CYKLUS);
+  vDemonu = demonSila() > .5;
+  hudbaTed();
+  popisek(Š/2, 190, 'TELEPORT: ' + jmeno, '#a0ffc9');
+  zablesk = .35; zvuk.portal(true);
+}
+function adminPrivolej(typ){
+  boss = null;
+  prekazky = prekazky.filter(p => !['vejce','vlna','pavoucek','sit','kruh'].includes(p.typ));
+  bossRada = BOSSI.indexOf(typ);
+  novyBoss();
+}
+function adminKlavesa(e){
+  if (e.code === 'Backquote'){ adminPanel = !adminPanel; return true; }
+  if (e.code === 'Escape'){ admin = false; nesmrtelny = false;
+    popisek(Š/2, 150, 'TESTOVACÍ REŽIM VYPNUT', '#ffd166'); return true; }
+  if (stav !== 'hra') return false;              // v menu admin klávesy nedělají nic
+
+  for (const [kl, cil, jm] of ADMIN_FAZE)
+    if (e.code === kl){ adminTeleport(cil, jm); return true; }
+  for (const [kl, typ] of ADMIN_BOSS)
+    if (e.code === kl){ adminPrivolej(typ); return true; }
+
+  switch (e.code){
+    case 'KeyT': turbo = 8; popisek(hrac.x, hrac.y - 44, 'TURBO', '#ffe066'); return true;
+    case 'KeyS': stit = true; popisek(hrac.x, hrac.y - 44, 'ŠTÍT', '#74d4ff'); return true;
+    case 'KeyG': magnet = 9; popisek(hrac.x, hrac.y - 44, 'MAGNET', '#ff9f9f'); return true;
+    case 'KeyC': zpomaleni = 6; popisek(hrac.x, hrac.y - 44, 'ZPOMALENÍ', '#a5f3ff'); return true;
+    case 'KeyH': hrac.zivoty = Math.min(hrac.zivoty + 1, 6);
+                 popisek(hrac.x, hrac.y - 44, '+1 SRDÍČKO', '#ff9fb0'); return true;
+    case 'KeyN': nesmrtelny = !nesmrtelny; hrac.nesmrt = 0;
+                 popisek(Š/2, 190, nesmrtelny ? 'NESMRTELNOST ZAPNUTA' : 'NESMRTELNOST VYPNUTA',
+                         nesmrtelny ? '#a0ffc9' : '#ffd166'); return true;
+    case 'KeyP': novyPortal(); portalCas = 14; return true;
+    case 'KeyB': if (bourka <= 0 && !boss){ bourka = 14; zvuk.hrom(); hudbaTed();
+                   popisek(Š/2, 150, 'BOUŘKA!', '#cfe3ff'); } return true;
+    case 'KeyO': prekazky = prekazky.filter(p => p.typ === 'pirko' || p.typ === 'zrno');
+                 popisek(Š/2, 190, 'ÚKLID', '#ffffff'); return true;
+    case 'Equal': case 'NumpadAdd':
+      hodiny += 30; popisek(Š/2, 190, 'ČAS +30 s (těžší)', '#ffd166'); return true;
+    case 'Minus': case 'NumpadSubtract':
+      hodiny = Math.max(0, hodiny - 30); popisek(Š/2, 190, 'ČAS -30 s (lehčí)', '#ffd166'); return true;
+  }
+  return false;
+}
+
+function akce(){
+  if (stav === 'padam') return;          // během pádu se nedá nic dělat
+  if (stav !== 'hra') { zacniHru(); return; }
+  mavni();
+}
+addEventListener('keydown', e => {
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  if (e.code === 'Tab' && admin){             // testovací nesmrtelnost (jen po tajném kódu)
+    nesmrtelny = !nesmrtelny;
+    hrac.nesmrt = 0;
+    popisek(hrac.x, hrac.y - 54,
+            nesmrtelny ? 'NESMRTELNOST ZAP' : 'NESMRTELNOST VYP',
+            nesmrtelny ? '#8ce99a' : '#ff9f9f');
+    bum(hrac.x, hrac.y, nesmrtelny ? '#8ce99a' : '#ff9f9f', 20, 300);
+    zvuk.bonus();
+    return;
+  }
+  if (e.code === 'KeyM'){ zvuk.prepni(); return; }
+  // ---- tajný kód: sleduje posledních pár písmen ----
+  if (e.key && e.key.length === 1 && /[a-zA-Z]/.test(e.key)){
+    kodBuffer = (kodBuffer + e.key.toLowerCase()).slice(-TAJNY_KOD.length);
+    if (kodBuffer === TAJNY_KOD && !admin){
+      admin = true; adminBylo = true; adminPanel = true; kodBuffer = '';
+      popisek(Š/2, 150, 'TESTOVACÍ REŽIM ZAPNUT', '#a0ffc9');
+      zvuk.vyhraDuha();
+      return;
+    }
+  }
+  if (admin && adminKlavesa(e)) return;
+  if (stav !== 'hra' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')){
+    const k = pocetSlepic();
+    barvaSlepice = (barvaSlepice + (e.code === 'ArrowLeft' ? k-1 : 1)) % k;
+    zvuk.kvok(); return;
+  }
+  if (stav !== 'hra' && (e.code === 'ArrowUp' || e.code === 'ArrowDown')){
+    rezim = omez(rezim + (e.code === 'ArrowUp' ? -1 : 1), 0, 2);
+    zvuk.klik ? zvuk.klik() : zvuk.bod(); return;
+  }
+  akce();
+});
+platno.addEventListener('pointerdown', e => {
+  const r = platno.getBoundingClientRect();
+  const mx = (e.clientX - r.left) / r.width  * Š;
+  const my = (e.clientY - r.top ) / r.height * V;
+  if (mx > Š-52 && my > 40 && my < 100){ zvuk.prepni(); return; }
+  if (stav === 'menu' && Math.hypot(mx - Š/2, my - 96) < 95){
+    barvaSlepice = (barvaSlepice + 1) % pocetSlepic();
+    zvuk.kvok(); return;
+  }
+  akce();
+});
+
+// ============ ŠŤÁVA ============
+let castice = [], popisky = [], otres = 0, zablesk = 0;
+
+function bum(x, y, barva='#ffd166', kolik=14, sila=260){
+  for (let i=0;i<kolik;i++){
+    const a = nah(0, Math.PI*2), r = nah(60, sila);
+    castice.push({x, y, vx:Math.cos(a)*r, vy:Math.sin(a)*r,
+                  zivot:nah(.3,.8), max:.8, barva, vel:nah(3,6)});
+  }
+}
+const zatres = s => otres = Math.max(otres, s);
+const popisek = (x,y,text,barva='#fff') => popisky.push({x,y,text,barva,zivot:1});
+
+function efektyKrok(dt){
+  for (const c of castice){
+    c.x += c.vx*dt; c.y += c.vy*dt;
+    if (c.pero){ c.vy += 70*dt; c.vx += Math.sin(c.zivot*9) * 34 * dt; c.uhel += c.rot*dt; }
+    else c.vy += 420*dt;
+    c.zivot -= dt;
+  }
+  castice = castice.filter(c => c.zivot > 0);
+  for (const p of popisky){ p.y -= 45*dt; p.zivot -= dt*1.3; }
+  popisky = popisky.filter(p => p.zivot > 0);
+  otres = Math.max(0, otres - dt*45);
+  zablesk = Math.max(0, zablesk - dt*2.5);
+}
+function efektyKresli(){
+  for (const c of castice){
+    ctx.globalAlpha = Math.max(0, c.zivot / c.max);
+    ctx.fillStyle = c.barva;
+    if (c.pero){
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.uhel);
+      ctx.beginPath(); ctx.ellipse(0, 0, c.vel, c.vel*.4, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    } else ctx.fillRect(c.x - c.vel/2, c.y - c.vel/2, c.vel, c.vel);
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = 'bold 26px system-ui';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.5)';
+  for (const p of popisky){
+    ctx.globalAlpha = Math.min(1, p.zivot);
+    ctx.strokeText(p.text, p.x, p.y);
+    ctx.fillStyle = p.barva;
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============ HERNÍ SVĚT ============
+const ZEM = 496, STROP = 6;
+const GRAVITACE = 1500, MAV = -430;
+const DUHA = ['#ff6b6b','#ffd166','#8ce99a','#74c0fc','#b197fc','#ffa8d8'];
+
+let stav = 'menu';
+let skore = 0, zrnka = 0, hodiny = 0, rekord = 0;
+let rychlost = 210, obtiznost = 1, spawnCas = 0;
+let turbo = 0, pirkoCas = 0;
+let kombo = 0, dashCas = 0, dashCislo = 0;
+let boss = null, bossCas = 0, bossPocet = 0, bossPorazeno = 0, bossRada = 0;
+let konecCas = 0;
+let ujeto = 0, rekordUjeto = 0, rekordPrekonan = false;
+let rozjezd = 0, poleStrasak = false;
+let gravSmer = 1, portalCas = 0;        // 1 = normálně dolů, -1 = obráceně nahoru
+let maly = 0, zrychleniCas = 0, ambient = 2, dvojce = 0;
+const DVOJCE_ODSTUP = 80;
+function dvojceY(){ return dvojce > 0 ? hrac.y + DVOJCE_ODSTUP * gravSmer : null; }
+let statPortaly = 0, statObracene = 0, statKombo = 0;
+let vDemonu = false, chaosOhlaseno = false, statPeklo = 0;
+// ---- tajný testovací režim (odemkne se napsáním kódu) ----
+const TAJNY_KOD = 'kokodak';
+let kodBuffer = '', admin = false, adminPanel = true, adminBylo = false;
+let cyklPosun = 0;
+let stit = false, magnet = 0, zpomaleni = 0, naboje = 0, lepkavy = 0;
+let nesmrtelny = false;      // Tab = testovací nesmrtelnost
+let tajnaOdemcena = false, titulkyPosun = 0;
+const TITULKY = ['HRU VYMYSLEL: TY', 'programoval: Claude', 'v hlavní roli: slepice v helmě',
+                 'padouch: liška v letadle', 'kaskadér: netopýr', 'catering: kukuřičné pole',
+                 'osvětlení: světlušky', 'děkujeme všem slepicím'];
+let netopyrCas = 0;
+let kamarad = null, netopyrPresel = 0;
+let honic = null, honicCas = 0, kostlivec = null;
+const POLE_OCI = [];
+let bourka = 0, bourkaCas = 0, bourkaSila = 0, blesk = 0, bleskX = 480;
+let duha = 0;
+let pole = 0, poleCas = 0, poleSpawn = 0, poleFaze = 0;
+const KAPKY = Array.from({length: 150}, () => ({x: nah(0, 960), y: nah(0, 540), d: nah(11, 21), s: nah(720, 1020)}));
+
+const BARVY_SLEPICE = [
+  {jm:'BÍLÁ',  a:'#ffffff', b:'#fff6e2', c:'#f0dcb8', obrys:'#7a5230', pero:'#ffe9b0', k1:'#ffe08a', k2:'#f0a93c'},
+  {jm:'HNĚDÁ', a:'#f3c58e', b:'#dda15e', c:'#b8762f', obrys:'#5a3418', pero:'#ffdba8', k1:'#ffd08a', k2:'#c9752b'},
+  {jm:'ČERNÁ', a:'#767c8a', b:'#4b5160', c:'#2c3038', obrys:'#171a20', pero:'#9aa3b2', k1:'#9aa3b2', k2:'#5a6270'}
+];
+let barvaSlepice = 0;
+const REZIMY = [
+  {jm:'KLIDNÁ',   rychlost:.82, mezera: 34, zivoty:2, rust:.7},
+  {jm:'NORMÁLNÍ', rychlost:1,   mezera:  0, zivoty:1, rust:1},
+  {jm:'ŠÍLENÁ',   rychlost:1.22,mezera:-18, zivoty:1, rust:1.45}
+];
+let rezim = 1;
+function pocetSlepic(){ return tajnaOdemcena ? 4 : 3; }
+function paleta(){
+  if (barvaSlepice < 3) return BARVY_SLEPICE[barvaSlepice];
+  const h = (hodiny * 70) % 360, hs = (d, sat, sv) => 'hsl(' + ((h + d) % 360) + ',' + sat + '%,' + sv + '%)';
+  return { jm:'DUHOVÁ', a: hs(0, 95, 76), b: hs(35, 90, 62), c: hs(70, 85, 50),
+           obrys:'#4a3468', pero: hs(20, 100, 82), k1: hs(50, 95, 72), k2: hs(90, 85, 54) };
+}
+const HVEZDY = Array.from({length: 90}, () => ({x: nah(0, 960), y: nah(8, 350), r: nah(.7, 2), f: nah(0, 7)}));
+function mixBarev(a, b, t){
+  const p = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  const A = p(a), B = p(b);
+  return 'rgb(' + A.map((v,i) => Math.round(v + (B[i]-v)*t)).join(',') + ')';
+}
+
+const hrac = { x: 230, y: 250, vy: 0, r: 15, uhel: 0, puls: 0, nesmrt: 0, zivoty: 3, mavF: 0 };
+let turboBylo = false;
+let prekazky = [];
+
+const mraky = Array.from({length: 7}, () => ({ x: nah(0,Š), y: nah(40,220), m: nah(.7,1.6), v: nah(12,26) }));
+let posunZeme = 0, posunKopcu = 0;
+
+function zacniHru(){
+  stav = 'hra';
+  skore = 0; zrnka = 0; hodiny = 0; spawnCas = 1.5;
+  turbo = 0; pirkoCas = 14;
+  kombo = 0; dashCas = 0;
+  boss = null; bossCas = 22; bossPocet = 0; bossPorazeno = 0; bossRada = 0; netopyrCas = 6;
+  kamarad = null; netopyrPresel = 0;
+  honic = null; honicCas = nah(7, 14); kostlivec = null; POLE_OCI.length = 0;
+  bourka = 0; bourkaSila = 0; blesk = 0; bourkaCas = nah(26, 38); duha = 0;
+  pole = 0; poleCas = nah(28, 40); poleSpawn = 0; poleFaze = 0; poleStrasak = false;
+  ujeto = 0; rekordPrekonan = false; rozjezd = 3;
+  gravSmer = 1; portalCas = 16; maly = 0; zrychleniCas = 0; ambient = 2; dvojce = 0;
+  statPortaly = 0; statObracene = 0; statKombo = 0; vDemonu = false; chaosOhlaseno = false;
+  statPeklo = 0; stit = false; magnet = 0; zpomaleni = 0; naboje = 0; lepkavy = 0;
+  cyklPosun = 0; adminBylo = admin;
+  hrac.r = 15;
+  castice = []; popisky = []; otres = 0; zablesk = 0;
+  prekazky = [];
+  hrac.x = 230; hrac.y = 250; hrac.vy = 0; hrac.uhel = 0;
+  hrac.zivoty = REZIMY[rezim].zivoty; hrac.nesmrt = 0; hrac.puls = 0; turboBylo = false;
+  zvuk.start();
+  hudbaTed();
+}
+
+function mavni(){
+  hrac.vy = MAV * gravSmer * (lepkavy > 0 ? .6 : 1);      // v pavučině mávneš slaběji
+  hrac.puls = 1;
+  hrac.mavF = 1;
+  zvuk.mav();
+  for (let i=0;i<4;i++)
+    castice.push({x:hrac.x-14, y:hrac.y+nah(-6,10), vx:nah(-140,-40), vy:nah(-60,40),
+                  zivot:nah(.3,.6), max:.6, barva: turbo > 0 ? nahZ(DUHA) : '#fffaf0', vel:nah(3,5)});
+}
+
+// ---------- výroba překážek ----------
+function novaTrubka(){
+  const mezera = dvojce > 0 ? 258
+               : omez(214 - hodiny*1.3, 162, 214) + REZIMY[rezim].mezera - demonSila() * 26;
+  const y = nah(70, ZEM - mezera - 70);
+  prekazky.push({ typ:'trubka', x: Š + 60, š: 74, mezeraY: y, mezeraV: mezera, bod:false,
+                  bonus: hodiny > 6 && Math.random() < .28 });
+  if (Math.random() < .55)
+    prekazky.push({ typ:'zrno', x: Š + 97, y: y + mezera/2, r: 15, faze: nah(0,7) });
+}
+function novaPila(){
+  const kolik = Math.random() < .35 ? 2 : 1;
+  for (let i=0;i<kolik;i++){
+    const y = nah(120, ZEM - 120);
+    prekazky.push({ typ:'pila', x: Š + 60 + i*150, y, zaklad: y, r: 30,
+                    amp: nah(0, 90), faze: nah(0,7), tempo: nah(.9,1.6), uhel: 0, bod:false });
+  }
+}
+function noveOstny(){
+  prekazky.push({ typ:'ostny', x: Š + 60, š: nah(110, 190), kde: nahZ(['dole','nahore','oboje']),
+                  v: 62, bod:false });
+}
+function novyNetopyr(){
+  netopyrCas = 8;                        // další nejdřív za 8 sekund
+  prekazky.push({ typ:'netopyr', x: Š + 70, y: nah(120, ZEM-120), vy: 0,
+                  r: 18, stav:'klid', timer: 0, utok: 0, uhel: nah(0,7),
+                  zmena: 1, faze: 0, bod:false });
+}
+function portalObjekt(druh, x){
+  return { typ:'portal', druh, x, faze: nah(0, 7), bod:false, doObracene: gravSmer === 1 };
+}
+function novyPortal(){
+  const nabidka = hodiny > 34 ? ['gravitace','gravitace','zmenseni','rychlost','dvojce']
+                : hodiny > 26 ? ['gravitace','gravitace','zmenseni','rychlost'] : ['gravitace'];
+  const druh = nahZ(nabidka);
+  portalCas = druh === 'gravitace' ? (gravSmer === -1 ? 7 : 13) : 12;
+  prekazky.push(portalObjekt(druh, Š + 80));
+
+  // po dvou minutách nastane portálový chaos — tři portály za sebou
+  if (hodiny > 120){
+    if (!chaosOhlaseno){
+      chaosOhlaseno = true;
+      popisek(Š/2, 150, 'PORTÁLOVÝ CHAOS!', '#c58cff');
+      zvuk.portal(true);
+    }
+    for (let q = 1; q <= 2; q++){
+      const d2 = nahZ(['gravitace','zmenseni','rychlost','gravitace']);
+      const p3 = portalObjekt(d2, Š + 80 + q * 320);
+      if (d2 === 'gravitace' && q === 2) p3.doObracene = !p3.doObracene;
+      prekazky.push(p3);
+    }
+    portalCas = 6;
+    return;
+  }
+
+  // dvojitá gravitace — dva portály hned za sebou
+  if (druh === 'gravitace' && hodiny > 32 && Math.random() < .33){
+    const p2 = portalObjekt('gravitace', Š + 80 + 340);
+    p2.doObracene = !p2.doObracene;
+    prekazky.push(p2);
+    portalCas += 5;
+  }
+}
+function novyBonus(){
+  const druh = nahZ(['pirko','pirko','pirko','stit','stit','magnet','cas']);
+  prekazky.push({ typ:'pirko', druh, x: Š + 60, y: nah(110, ZEM - 110), r: 18, faze: nah(0,7) });
+}
+
+function vyrobPrekazku(){
+  if (dvojce > 0){ novaTrubka(); return; }        // ve dvou jen trubky, ať se to dá uletět
+  const jenTrubky = hodiny < 8;
+  const maNetopyra = prekazky.some(p => p.typ === 'netopyr');
+  if (hodiny > 16 && portalCas <= 0 && pole <= 0){ novyPortal(); spawnCas += .5; return; }
+  let los = jenTrubky ? 'trubka'
+          : demonSila() > .4
+            ? nahZ(['pila','ostny','pila','ostny','trubka','pila','netopyr','ostny'])
+            : nahZ(['trubka','trubka','pila','ostny','netopyr','trubka','pila','ostny']);
+  if (los === 'netopyr' && (maNetopyra || netopyrCas > 0 || bourka > 0)) los = 'trubka';
+  if (los === 'trubka') novaTrubka();
+  else if (los === 'pila') novaPila();
+  else if (los === 'ostny') noveOstny();
+  else novyNetopyr();
+}
+
+// ---------- zásah a turbo ----------
+function konecHry(){
+  rekordUjeto = Math.max(rekordUjeto, ujeto);
+  titulkyPosun = 0;
+  stav = 'padam';                 // slepice ještě spadne a zatočí se
+  konecCas = 1.05;
+  hrac.vy = -210;
+  hrac.nesmrt = 0;
+  zvuk.hudbaStop(); zvuk.konec();
+}
+
+function zasah(text, smrtelny = false){
+  if (nesmrtelny){                            // testovací režim: jen to cukne a letíš dál
+    hrac.puls = 1;
+    bum(hrac.x, hrac.y, '#8ce99a', 6, 160);
+    return;
+  }
+  if (turbo > 0 || hrac.nesmrt > 0) return;
+  if (stit){                                  // štít spolkne jednu ránu, i tu smrtelnou
+    stit = false;
+    hrac.nesmrt = 1.4;
+    hrac.vy = MAV * gravSmer * .7;
+    bum(hrac.x, hrac.y, '#74d4ff', 24, 340);
+    popisek(hrac.x, hrac.y - 42, 'ŠTÍT PRASKL!', '#74d4ff');
+    zatres(9); zvuk.tuk();
+    return;
+  }
+  if (smrtelny) hrac.zivoty = 0; else hrac.zivoty--;
+  hrac.nesmrt = 1.5;
+  hrac.vy = -230;
+  hrac.puls = 1;
+  kombo = 0;
+  bum(hrac.x, hrac.y, '#fffaf0', 20);
+  bum(hrac.x, hrac.y, '#ffd166', 10);
+  popisek(hrac.x, hrac.y - 34, text, '#ffe066');
+  zatres(11);
+  zvuk.tuk(); zvuk.kvok();
+  if (hrac.zivoty <= 0) konecHry();
+}
+
+function rozbij(p, i, kde){
+  prekazky.splice(i, 1);
+  skore += 2;
+  bum(kde.x, kde.y, nahZ(DUHA), 16, 300);
+  popisek(kde.x, kde.y - 24, '+2!', '#ffffff');
+  zatres(6);
+  zvuk.bam();
+}
+
+function seberPirko(p, i){
+  prekazky.splice(i, 1);
+  zatres(7);
+  if (p.druh === 'stit'){
+    stit = true;
+    bum(p.x, p.y, '#74d4ff', 22, 300);
+    popisek(hrac.x, hrac.y - 44, 'ŠTÍT!', '#74d4ff');
+    zvuk.bonus();
+  } else if (p.druh === 'magnet'){
+    magnet = 9;
+    bum(p.x, p.y, '#ff6b6b', 22, 300);
+    popisek(hrac.x, hrac.y - 44, 'MAGNET!', '#ff9f9f');
+    zvuk.bonus();
+  } else if (p.druh === 'cas'){
+    zpomaleni = 5;
+    bum(p.x, p.y, '#a5f3ff', 22, 300);
+    popisek(hrac.x, hrac.y - 44, 'ZPOMALENÍ!', '#a5f3ff');
+    zvuk.portal(false);
+  } else {
+    turbo = Math.min(turbo + 5, 8);
+    bum(p.x, p.y, nahZ(DUHA), 24, 320);
+    popisek(hrac.x, hrac.y - 44, 'TURBO!', '#ffe066');
+    zvuk.turbo();
+  }
+}
+
+function padamKrok(dt){
+  konecCas -= dt;
+  hrac.vy += GRAVITACE * gravSmer * dt;
+  hrac.y = omez(hrac.y + hrac.vy * dt, STROP + hrac.r, ZEM - hrac.r);
+  hrac.uhel = Math.min(hrac.uhel + dt * 5.5, 1.9);
+  hrac.x += (230 - hrac.x) * 2 * dt;
+  if (konecCas <= 0){
+    stav = 'konec';
+    if (!adminBylo) rekord = Math.max(rekord, skore);      // testovací hra nekazí rekord
+  }
+}
+
+function pripisBod(kolik, zlata = false){
+  skore += kolik;
+  kombo++;
+  if (zlata){
+    zvuk.bonus();
+    popisek(hrac.x + 52, hrac.y - 36, '+5!', '#ffd166');
+    bum(hrac.x + 40, hrac.y, '#ffd166', 14, 240);
+    zatres(4);
+  } else {
+    zvuk.bod();
+    popisek(hrac.x + 44, hrac.y - 30, '+' + kolik, '#ffffff');
+  }
+  if (kombo % 5 === 0){
+    dashCas = 1.2; dashCislo = kombo;
+    skore += 5;
+    zablesk = .35;
+    zatres(6);
+    zvuk.dash();
+  }
+}
+
+// ---------- kamarád netopýr: sbírá za tebe kukuřici ----------
+function honicKrok(h, dt, nocS, demS){
+  h.faze += dt * 2.2;
+  const rychl = h.demon ? 112 : 82;
+  const dx = hrac.x - h.x, dy = hrac.y - h.y;
+  const d = Math.hypot(dx, dy) || 1;
+  h.x += dx / d * rychl * dt;
+  h.y += dy / d * rychl * dt + Math.sin(h.faze) * 26 * dt;
+
+  // kostlivá slepice ho zahání
+  if (kostlivec && Math.hypot(kostlivec.x - h.x, kostlivec.y - h.y) < 60){
+    popisek(h.x, h.y - 40, 'KŠŠŠ!', '#f0ece0');
+    bum(h.x, h.y, '#d6f2ff', 16, 280);
+    zvuk.pisk();
+    honic = null; honicCas = nah(16, 26);
+    return;
+  }
+  if (Math.hypot(hrac.x - h.x, hrac.y - h.y) < hrac.r + 19){
+    if (turbo > 0){
+      bum(h.x, h.y, '#d6f2ff', 26, 340);
+      popisek(h.x, h.y - 44, 'ZAHNAL JSI HO!', '#d6f2ff');
+      pripisBod(5); zatres(8); zvuk.bossAu();
+      honic = null; honicCas = nah(14, 22);
+      return;
+    }
+    zasah(h.demon ? 'PEKELNÝ DUCH!' : 'DUCH!');
+    bum(h.x, h.y, '#d6f2ff', 14, 240);
+    h.x = -70; h.y = hrac.y;                    // odletí a zkusí to znovu
+  }
+  if (nocS < .22 && demS < .22){                // za světla se rozplyne
+    bum(h.x, h.y, '#e8f7ff', 18, 240);
+    popisek(h.x, h.y - 40, 'rozplynul se', '#cfe3ff');
+    honic = null; honicCas = nah(10, 18);
+  }
+}
+
+function kostlivecKrok(k, dt){
+  k.faze += dt * 9;
+  let cil = null, nejd = 340, idx = -1;
+  for (let i = 0; i < prekazky.length; i++){
+    const p = prekazky[i];
+    if (p.typ !== 'zrno') continue;
+    const d = Math.hypot(k.x - p.x, k.y - p.y);
+    if (d < nejd){ nejd = d; cil = p; idx = i; }
+  }
+  const c = cil || (honic ? { x: honic.x, y: honic.y } : { x: hrac.x - 66, y: hrac.y + 46 });
+  k.vx += ((c.x - k.x) * 4.6 - k.vx) * 5 * dt;
+  k.vy += ((c.y - k.y) * 4.6 - k.vy) * 5 * dt;
+  const sp = Math.hypot(k.vx, k.vy) || 1;
+  if (sp > 560){ k.vx = k.vx / sp * 560; k.vy = k.vy / sp * 560; }
+  k.x += k.vx * dt; k.y += k.vy * dt;
+  if (cil && nejd < 28){
+    prekazky.splice(idx, 1);
+    zrnka++; skore += 3;
+    bum(cil.x, cil.y, '#ffd166', 12, 200);
+    popisek(cil.x, cil.y - 22, '+3', '#ffe066');
+    zvuk.zrno();
+  }
+}
+
+function kamaradKrok(k, dt){
+  k.faze += dt * 14;
+
+  // 1) nejdřív koukni, jestli na tebe neletí netopýr — toho jde odehnat
+  let hrozba = null, hd = 999;
+  for (const p of prekazky){
+    if (p.typ !== 'netopyr' || p.odehnany || p.stav === 'zdrha') continue;
+    if (p.stav !== 'utoci' && p.stav !== 'vsiml') continue;
+    if (p.x > hrac.x + 560) continue;
+    const d = Math.hypot(k.x - p.x, k.y - p.y);
+    if (d < hd){ hd = d; hrozba = p; }
+  }
+  if (hrozba){
+    k.vx += ((hrozba.x - k.x) * 6 - k.vx) * 6 * dt;
+    k.vy += ((hrozba.y - k.y) * 6 - k.vy) * 6 * dt;
+    const sp0 = Math.hypot(k.vx, k.vy) || 1;
+    if (sp0 > 620){ k.vx = k.vx / sp0 * 620; k.vy = k.vy / sp0 * 620; }
+    k.x += k.vx * dt; k.y += k.vy * dt;
+    if (hd < 36){                                   // vyžene ho
+      hrozba.stav = 'zdrha'; hrozba.vy = -320; hrozba.odehnany = true;
+      popisek(hrozba.x, hrozba.y - 32, 'KŠŠŠ!', '#ffb3c6');
+      bum(hrozba.x, hrozba.y, '#ffb3c6', 14, 240);
+      zvuk.pisk(); zatres(4);
+    }
+    return;
+  }
+
+  // 2) jinak sbírá kukuřici
+  let cil = null, nejd = 330, idx = -1;
+  for (let i = 0; i < prekazky.length; i++){
+    const p = prekazky[i];
+    if (p.typ !== 'zrno') continue;
+    const d = Math.hypot(k.x - p.x, k.y - p.y);
+    if (d < nejd){ nejd = d; cil = p; idx = i; }
+  }
+  const c = cil || { x: hrac.x - 62, y: hrac.y - 52 };     // jinak lítá u tebe
+  k.vx += ((c.x - k.x) * 4.5 - k.vx) * 5 * dt;
+  k.vy += ((c.y - k.y) * 4.5 - k.vy) * 5 * dt;
+  const sp = Math.hypot(k.vx, k.vy) || 1;
+  if (sp > 540){ k.vx = k.vx / sp * 540; k.vy = k.vy / sp * 540; }
+  k.x += k.vx * dt; k.y += k.vy * dt;
+  if (cil && nejd < 28){
+    prekazky.splice(idx, 1);
+    zrnka++; skore += 3;
+    bum(cil.x, cil.y, '#ffd166', 12, 200);
+    popisek(cil.x, cil.y - 22, '+3', '#ffe066');
+    zvuk.zrno();
+  }
+}
+
+// ---------- mozek netopýra ----------
+function netopyrKrok(n, dt){
+  n.faze += dt * 12;
+  const dx = n.x - hrac.x;
+  switch (n.stav){
+    case 'klid':
+      n.zmena -= dt;
+      if (n.zmena <= 0){ n.uhel += nah(-1.2, 1.2); n.zmena = nah(.5, 1.4); }
+      n.vy += (Math.sin(n.uhel) * 90 - n.vy) * 3 * dt;
+      if (dx < 420){ n.stav = 'vsiml'; n.timer = 1.1; zvuk.pisk(); }   // víc času na reakci
+      break;
+    case 'vsiml':
+      n.timer -= dt;
+      n.vy *= .9;
+      if (n.timer <= 0){ n.stav = 'utoci'; n.utok = 2.1; }
+      break;
+    case 'utoci': {
+      n.utok -= dt;
+      const cil = hrac.y + hrac.vy * .08;                       // skoro nepředvídá
+      n.vy += (Math.sign(cil - n.y) * 118 * Math.min(obtiznost, 1.5) - n.vy) * 1.7 * dt;
+      if (n.utok <= 0){ n.stav = 'unava'; n.timer = 2.4; }      // zadýchá se a nechá tě být
+      if (dx < -90) n.stav = 'zdrha';
+      break;
+    }
+    case 'unava':
+      n.timer -= dt;
+      n.vy += (55 - n.vy) * 1.4 * dt;
+      if (n.timer <= 0){ n.stav = 'klid'; n.zmena = 1; }
+      break;
+    case 'zdrha':
+      n.vy += (-260 - n.vy) * 3 * dt;
+      break;
+  }
+  n.y = omez(n.y + n.vy * dt, 40, ZEM - 30);
+  if (n.y <= 40 || n.y >= ZEM - 30) n.vy *= -.6;
+  n.x -= rychlost * .45 * dt;
+}
+
+// ---------- BOSS: liška v letadle ----------
+const BOSSI = ['vlk','pavouk','kohout','liska'];
+function jmenoBosse(t, dem){
+  if (t === 'vlk')    return 'VLK S BUBNEM!';
+  if (t === 'pavouk') return 'PAVOUČÍ KRÁLOVNA!';
+  if (t === 'kohout') return 'KOHOUT-DRAK!';
+  return dem ? 'DÉMONICKÁ LIŠKA!' : 'LIŠKA V LETADLE!';
+}
+function radaBosse(t){
+  if (t === 'vlk')    return 'Sbírej kukuřici a slétni nad buben, až k tobě přiběhne!';
+  if (t === 'pavouk') return 'S duhovým pírkem přeletěj její vlákna!';
+  if (t === 'kohout') return 'S pírkem proleť dírou v ohnivém kruhu!';
+  return 'Chytni duhové pírko a naleť do ní!';
+}
+function novyBoss(){
+  const pekelna = demonSila() > .4;
+  const typ = pekelna ? 'liska' : BOSSI[bossRada % 4];
+  bossPocet++;
+  if (!pekelna) bossRada++;                       // pekelná liška nepřeskočí frontu
+  boss = { typ, x: Š + 240, y: 220, vy: 0, zivoty: 3, stav: 'prilet', timer: 0,
+           vejceCas: 4, faze: 0, blik: 0, vrtule: 0, demon: pekelna, krok: 0,
+           strelCas: 1.6, nabiti: 0, salva: 0, mezera: 0, miri: 260, zpetny: 0,
+           bubenCas: 1.8, buch: 0, zrnoCas: .6,
+           pavoucekCas: 1.4, sitCas: 2.2,
+           kruhCas: 1.6, salva: 0, mezikruh: 0, chrl: 0 };
+  if (typ === 'liska'){ boss.zivoty = pekelna ? 4 : 3; boss.vejceCas = nah(5, 8); }
+  if (typ === 'vlk')    boss.y = ZEM - 56;
+  if (typ === 'pavouk') boss.y = 120;
+  if (typ === 'kohout') boss.y = ZEM - 100;
+  naboje = 0;
+  pirkoCas = Math.min(pirkoCas, 2.5);
+  if (typ === 'liska') zvuk.motor();
+  else if (typ === 'vlk') zvuk.buben();
+  else if (typ === 'pavouk') zvuk.pavouk();
+  else zvuk.ohen();
+  popisek(Š/2, 130, jmenoBosse(typ, pekelna),
+          typ === 'vlk' ? '#c9a0ff' : typ === 'pavouk' ? '#a0ffc9' : typ === 'kohout' ? '#ffb347'
+          : pekelna ? '#ff5d5d' : '#ff9f9f');
+  hudbaTed();
+}
+
+function bossKrok(b, dt){
+  if (b.typ !== 'liska') return bossKrokNovy(b, dt);
+  b.faze += dt * 3;
+  b.vrtule += dt * 34;
+  if (b.demon && Math.random() < .5)              // ohnivá stopa za letadlem
+    castice.push({x: b.x + 44, y: b.y + nah(-8, 12), vx: nah(-260,-120), vy: nah(-50, 20),
+                  zivot: nah(.3, .7), max: .7, barva: nahZ(['#ff7a2f','#ffd166','#e63946']), vel: nah(5, 10)});
+  b.blik = Math.max(0, b.blik - dt);
+
+  switch (b.stav){
+    case 'prilet':
+      b.x += (700 - b.x) * 1.6 * dt;
+      b.y += (hrac.y - b.y) * 1.2 * dt;
+      if (b.x < 760){ b.stav = 'utoci'; b.timer = 0; }
+      break;
+
+    case 'utoci': {
+      b.timer += dt;
+      b.x += (700 + Math.sin(b.faze) * 26 - b.x) * 2 * dt;
+      if (b.zivoty === 1) b.x += Math.sin(hodiny * 46) * 2.2;      // zuřivě se třese
+      if (b.nabiti > 0 || b.salva > 0){          // zamířila a drží výšku
+        b.vy += (0 - b.vy) * 6 * dt;
+      } else {
+        const cil = omez(hrac.y + hrac.vy * .18, 110, ZEM - 110);
+        b.vy += (Math.sign(cil - b.y) * 105 * obtiznost - b.vy) * 2.2 * dt;
+      }
+      b.y = omez(b.y + b.vy * dt, 100, ZEM - 100);
+      // --- kukuřičný kanón: míří na tvoji výšku a střílí vodorovně ---
+      if (b.salva > 0){
+        b.mezera -= dt;
+        if (b.mezera <= 0){
+          b.salva--; b.mezera = .15; b.zpetny = 1;
+          prekazky.push({ typ:'strela', x: b.x - 74, y: b.miri, r: 11,
+                          vx: -(660 + rychlost * .35), faze: nah(0, 7), ohniva: !!b.demon });
+          zvuk.pukanec();
+        }
+      } else if (b.nabiti > 0){
+        b.nabiti -= dt;                          // chvilka na uhnutí + zaměřovací čára
+        if (b.nabiti <= 0){ b.salva = b.zivoty === 1 ? (b.demon ? 6 : 5) : (b.demon ? 4 : 3); b.mezera = 0; }
+      } else {
+        b.strelCas -= dt;
+        if (b.strelCas <= 0){
+          b.strelCas = omez((b.demon ? 2.1 : 2.6) / obtiznost, 1.1, 2.6) * (b.zivoty === 1 ? .45 : 1);
+          b.miri = b.y + 22;                     // střílí ze své vlastní hlavně
+          b.nabiti = b.zivoty === 1 ? .3 : omez(.55 / obtiznost, .34, .55);
+          zvuk.nabij();
+        }
+      }
+      b.zpetny = Math.max(0, b.zpetny - dt * 4);
+
+      // --- zlaté vejce jen občas, jako dárek ---
+      b.vejceCas -= dt;
+      if (b.vejceCas <= 0){
+        hodVejce(b);
+        b.vejceCas = nah(7, 11);
+      }
+      if (b.timer > 30) b.stav = 'odlet';     // po půl minutě to vzdá sama
+      break;
+    }
+
+    case 'zasazena':
+      b.timer -= dt;
+      b.x += (880 - b.x) * 2.5 * dt;
+      b.y += Math.sin(b.timer * 40) * 3;
+      if (b.timer <= 0){ b.stav = 'utoci'; b.timer = 0; b.strelCas = .9; b.nabiti = 0; b.salva = 0; }
+      break;
+
+    case 'odlet':
+      b.x += 420 * dt;
+      b.y -= 90 * dt;
+      if (b.x > Š + 260){
+        boss = null;
+        bossCas = demonSila() > .45 ? 4 : 22;
+        hudbaTed();
+      }
+      break;
+  }
+}
+
+// ---------- vlk s bubnem ----------
+function vlkUtok(b, dt){
+  b.y = ZEM - 56;
+  b.krok += dt * 10;
+  // pobíhá po dvoře: dobíhá až pod tebe a zase se vrací
+  const cil = 520 + Math.sin(b.faze * .5) * 285;
+  b.x += (cil - b.x) * 1.9 * dt;
+  b.buch = Math.max(0, b.buch - dt * 3.2);
+  b.bubenCas -= dt;
+  if (b.bubenCas <= 0 && b.x > 470){
+    b.bubenCas = omez(2.5 / obtiznost, 1.25, 2.5);
+    b.buch = 1;
+    const kde = nahZ(['zem','vzduch','zem']);
+    prekazky.push({ typ:'vlna', kde, x: b.x - 46,
+                    y: kde === 'zem' ? ZEM - 62 : nah(210, 340),
+                    v: 124, faze: 0 });
+    zvuk.buben(); zatres(8);
+  }
+  b.zrnoCas -= dt;                                   // musí být z čeho střílet
+  if (b.zrnoCas <= 0){
+    b.zrnoCas = nah(1.3, 2);
+    prekazky.push({ typ:'zrno', x: Š + 40, y: nah(120, ZEM - 130), r: 15, faze: nah(0,7) });
+  }
+}
+
+// ---------- pavoučí královna ----------
+function pavoukUtok(b, dt){
+  b.x += (690 + Math.sin(b.faze * .45) * 80 - b.x) * 1.7 * dt;
+  b.y = 118 + Math.sin(b.faze) * 16;
+  b.pavoucekCas -= dt;
+  if (b.pavoucekCas <= 0){
+    b.pavoucekCas = omez(2 / obtiznost, 1, 2);
+    prekazky.push({ typ:'pavoucek', x: b.x + nah(-50, 50), y: b.y + 34, vy: 150, r: 13,
+                    faze: nah(0,7), horni: b.y + 34, dolni: nah(300, ZEM - 40) });
+    zvuk.pavouk();
+  }
+  b.sitCas -= dt;
+  if (b.sitCas <= 0){
+    b.sitCas = nah(2.8, 4.2);
+    prekazky.push({ typ:'sit', x: Š + 60, y: nah(150, ZEM - 150), r: 40, faze: nah(0,7) });
+  }
+}
+
+// ---------- kohout-drak ----------
+function kohoutUtok(b, dt){
+  b.y = ZEM - 100 + Math.sin(b.faze) * 7;
+  b.x += (800 - b.x) * 2 * dt;
+  b.chrl = Math.max(0, b.chrl - dt * 2.5);
+  if (b.salva > 0){
+    b.mezikruh -= dt;
+    if (b.mezikruh <= 0){
+      b.salva--; b.mezikruh = .8; b.chrl = 1;
+      prekazky.push({ typ:'kruh', x: b.x - 76,
+                      y: omez(hrac.y + nah(-70, 70), 140, ZEM - 140),
+                      r: 76, dira: 42, vx: -(rychlost + 110), faze: nah(0,7), vraceno: false });
+      zvuk.ohen();
+    }
+  } else {
+    b.kruhCas -= dt;
+    if (b.kruhCas <= 0){
+      b.cyklus = (b.cyklus || 0) + 1;
+      b.kruhCas = omez(5.2 / obtiznost, 3, 5.2);
+      if (b.cyklus % 3 === 0){                 // každý třetí útok je jedna obří koule
+        b.chrl = 1;
+        prekazky.push({ typ:'koule', x: b.x - 80, y: omez(hrac.y, 150, ZEM - 150),
+                        r: 46, vx: -(rychlost * .55 + 120), faze: nah(0, 7) });
+        popisek(b.x - 90, b.y - 120, 'OHNIVÁ KOULE!', '#ff7a2f');
+        zvuk.ohen(); zvuk.hrom(); zatres(8);
+      } else { b.salva = 3; b.mezikruh = 0; }
+    }
+  }
+}
+
+function bossKrokNovy(b, dt){
+  b.faze += dt * 3;
+  b.blik = Math.max(0, b.blik - dt);
+  const cilX = b.typ === 'vlk' ? 620 : b.typ === 'pavouk' ? 690 : 800;
+
+  switch (b.stav){
+    case 'prilet':
+      b.x += (cilX - b.x) * 2.2 * dt;
+      if (b.x < cilX + 50){ b.stav = 'utoci'; b.timer = 0; }
+      break;
+
+    case 'utoci':
+      b.timer += dt;
+      if (b.typ === 'vlk')    vlkUtok(b, dt);
+      if (b.typ === 'pavouk') pavoukUtok(b, dt);
+      if (b.typ === 'kohout') kohoutUtok(b, dt);
+      if (b.timer > 36) b.stav = 'odlet';
+      break;
+
+    case 'zasazena':
+      b.timer -= dt;
+      b.x += (cilX + 110 - b.x) * 2.5 * dt;
+      b.y += Math.sin(b.timer * 40) * 3;
+      if (b.typ === 'vlk')    b.krok += dt * 4;
+      if (b.timer <= 0){ b.stav = 'utoci'; b.timer = 0; }
+      break;
+
+    case 'odlet':
+      b.x += 430 * dt;
+      b.y += (b.typ === 'pavouk' ? -170 : -70) * dt;
+      if (b.x > Š + 320){ boss = null; bossCas = demonSila() > .45 ? 4 : 22; hudbaTed(); }
+      break;
+  }
+}
+
+// liška už neháže obyčejná vejce — jen občas pustí zlaté jako dárek
+function hodVejce(b){
+  prekazky.push({ typ:'vejce', x: b.x - 60, y: b.y + 26, vx: -215 - nah(0, 50),
+                  vy: nah(-90, 10), r: 16, uhel: 0, bod:false, zlate: true });
+  popisek(b.x - 70, b.y - 4, 'ZLATÉ VEJCE!', '#ffd166');
+  zvuk.bonus();
+}
+
+function bossZasah(b){
+  b.zivoty--;
+  b.blik = .5;
+  b.stav = 'zasazena'; b.timer = 1.1;
+  bum(b.x, b.y, '#ff9f9f', 22, 340);
+  bum(b.x, b.y, '#ffd166', 14, 260);
+  zatres(14); zablesk = .3;
+  zvuk.bossAu();
+  if (b.zivoty <= 0){
+    b.stav = 'odlet';
+    skore += 50; bossPorazeno++;
+    if (!tajnaOdemcena){
+      tajnaOdemcena = true;
+      popisek(Š/2, 210, 'ODEMKNUTA DUHOVÁ SLEPICE!', '#c58cff');
+    }
+    popisek(b.x, b.y - 60, '+50  SESTŘELENA!', '#ffe066');
+    bum(b.x, b.y, '#ffffff', 34, 420);
+    zatres(18);
+    zvuk.bossKonec();
+  } else {
+    popisek(b.x, b.y - 60, 'AUUU!', '#ffe066');
+    if (b.typ === 'liska' && b.zivoty === 1){
+      popisek(Š/2, 175, 'LIŠKA ZUŘÍ!', '#ff5d5d');
+      zablesk = .3; zatres(10); zvuk.hrom();
+    }
+  }
+}
+
+// ============ KROK HRY ============
+function krok(dt){
+  hodiny += dt;
+  obtiznost = Math.min(1 + hodiny * REZIMY[rezim].rust / 45, 2.4);
+  turbo = Math.max(0, turbo - dt);
+  netopyrCas = Math.max(0, netopyrCas - dt);
+  duha = Math.max(0, duha - dt);
+  if (rezimHudby() !== hudbaRezim) hudbaTed();        // hudba se mění s prostředím
+
+  const dem = demonSila();
+  if (dem > .5 && !vDemonu){
+    vDemonu = true;
+    popisek(Š/2, 190, 'DÉMONICKÁ OBLAST!', '#ff6b6b');
+    zvuk.hrom(); zablesk = .4;
+    if (!boss) bossCas = Math.min(bossCas, 3);      // v pekle na tebe hned čeká démonická liška
+  } else if (dem < .25 && vDemonu){
+    vDemonu = false; statPeklo++;
+    popisek(Š/2, 190, 'PŘEŽIL JSI PEKLO!', '#ffd166');
+    zvuk.vyhraDuha();
+  }
+  portalCas = Math.max(0, portalCas - dt);
+
+  if (gravSmer === -1) statObracene += dt;
+  statKombo = Math.max(statKombo, kombo);
+
+  if (dvojce > 0){
+    dvojce -= dt;
+    const dy = hrac.y + DVOJCE_ODSTUP * gravSmer;
+    if (dy > ZEM - hrac.r || dy < STROP + hrac.r) zasah('DVOJČE NARAZILO!', true);
+    if (dvojce <= 0){
+      popisek(hrac.x, hrac.y - 46, 'ZASE SÁM', '#ff8fb1');
+      bum(hrac.x, hrac.y + DVOJCE_ODSTUP * gravSmer, '#ff8fb1', 14, 260);
+    }
+  }
+  if (magnet > 0){                            // magnet přitáhne kukuřici
+    magnet -= dt;
+    for (const p of prekazky){
+      if (p.typ !== 'zrno') continue;
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) > 320) continue;
+      p.x += (hrac.x - p.x) * 3.4 * dt;
+      p.y += (hrac.y - p.y) * 3.4 * dt;
+    }
+  }
+  if (zpomaleni > 0) zpomaleni -= dt;
+  if (lepkavy > 0) lepkavy -= dt;
+  if (maly > 0){
+    maly -= dt;
+    if (maly <= 0){
+      hrac.r = 15;
+      popisek(hrac.x, hrac.y - 46, 'ZASE VELKÁ!', '#8ce99a');
+      bum(hrac.x, hrac.y, '#8ce99a', 14, 260);
+    }
+  }
+  if (zrychleniCas > 0){
+    zrychleniCas -= dt;
+    if (zrychleniCas <= 0) hudbaTed();
+  }
+
+  // zvuky okolí podle počasí a denní doby
+  ambient -= dt;
+  if (ambient <= 0){
+    if (bourka > 0){ zvuk.vitr(); ambient = nah(1.1, 2.1); }
+    else if (hodiny / 55 > .5){ zvuk.cvrcek(); ambient = nah(1.6, 3.4); }
+    else { zvuk.ptacek(); ambient = nah(3, 6); }
+  }
+  if (barvaSlepice === 3 && Math.random() < dt * 22)   // duhová slepice nechává stopu pořád
+    castice.push({x: hrac.x - 14, y: hrac.y + nah(-10, 10), vx: nah(-150,-50), vy: nah(-25, 25),
+                  zivot: nah(.35, .7), max: .7, barva: paleta().b, vel: nah(4, 7)});
+  if (duha > 0 && Math.random() < dt * 16)          // barevná stopa po bouřce
+    castice.push({x: hrac.x - 16, y: hrac.y + nah(-9, 9), vx: nah(-170,-60), vy: nah(-30, 30),
+                  zivot: nah(.3, .6), max: .6, barva: nahZ(DUHA), vel: nah(3, 6)});
+
+  // --- bouřka ---
+  if (bourka > 0){
+    bourka -= dt;
+    bourkaSila = omez(Math.min(bourka, 14 - bourka) / 1.6, 0, 1);
+    hrac.vy += 290 * bourkaSila * dt;                 // vítr tlačí dolů
+    blesk = Math.max(0, blesk - dt * 2.5);
+    if (Math.random() < dt * .3){ blesk = 1; bleskX = nah(120, Š - 120); zablesk = .4; zvuk.hrom(); }
+    if (bourka <= 0){
+      bourkaSila = 0; bourkaCas = nah(30, 44); duha = 15;
+      popisek(Š/2, 170, 'DUHA!', '#8ce99a');
+      zvuk.vyhraDuha();
+      hudbaTed();
+    }
+  } else if (!boss){
+    bourkaCas -= dt;
+    if (bourkaCas <= 0){
+      bourka = 14;
+      popisek(Š/2, 150, 'BOUŘKA!', '#cfe3ff');
+      zvuk.hrom();
+      hudbaTed();
+    }
+  }
+  dashCas = Math.max(0, dashCas - dt);
+  rozjezd = Math.max(0, rozjezd - dt);
+  const rozlet = 1 - .45 * (rozjezd / 3);          // první tři vteřiny letíš pomaleji
+  const peklo = demonSila();
+  rychlost = 210 * obtiznost * REZIMY[rezim].rychlost * (1 + peklo * .26) *
+             (turbo > 0 ? 1.5 : 1) * (zrychleniCas > 0 ? 1.45 : 1) *
+             (zpomaleni > 0 ? .62 : 1) * rozlet;
+  ujeto += rychlost * dt;
+
+  // překonání vlastního rekordu
+  if (rekordUjeto > 0 && !rekordPrekonan && ujeto >= rekordUjeto){
+    rekordPrekonan = true;
+    popisek(hrac.x, hrac.y - 58, 'NOVÝ REKORD!', '#ffe066');
+    for (let i = 0; i < 3; i++) bum(hrac.x + nah(-40, 40), hrac.y + nah(-30, 30), nahZ(DUHA), 12, 300);
+    zablesk = .35; zatres(7); zvuk.vyhraDuha();
+  }
+
+  // --- slepice ---
+  hrac.vy += GRAVITACE * gravSmer * dt;
+  hrac.y  += hrac.vy * dt;
+  hrac.uhel = omez(hrac.vy * gravSmer / 800, -.55, 1.0);
+  hrac.puls = Math.max(0, hrac.puls - dt * 3);
+  hrac.mavF = Math.max(0, hrac.mavF - dt * 3.2);
+  hrac.nesmrt = Math.max(0, hrac.nesmrt - dt);
+
+  // v turbu se slepice rozjede dopředu (a po turbu se pomalu vrací + chvíli bliká)
+  const cilX = turbo > 0 ? 620 : 230;
+  hrac.x += omez((cilX - hrac.x) * 3, -210, 900) * dt;
+  if (turboBylo && turbo <= 0){ hrac.nesmrt = Math.max(hrac.nesmrt, 1.2); }
+  turboBylo = turbo > 0;
+
+  if (turbo > 0)
+    for (let i=0;i<2;i++)
+      castice.push({x:hrac.x - nah(10,34), y:hrac.y + nah(-10,10), vx:nah(-260,-120), vy:nah(-40,40),
+                    zivot:nah(.2,.45), max:.45, barva:nahZ(DUHA), vel:nah(4,8)});
+
+  if (hrac.vy > 230 && Math.random() < dt * 5){
+    const B = paleta();
+    castice.push({x: hrac.x - 6, y: hrac.y + 6, vx: nah(-110,-20), vy: nah(-40, 20),
+                  zivot: nah(.7, 1.3), max: 1.3, barva: nahZ([B.a, B.pero]),
+                  vel: nah(6, 9), pero: true, uhel: nah(0, 7), rot: nah(-3.5, 3.5)});
+  }
+  if (hrac.y > ZEM - hrac.r){
+    hrac.y = ZEM - hrac.r;
+    if (gravSmer === 1){ hrac.vy = -140; zasah('AU, ZEM!', true); }
+    else hrac.vy = -Math.abs(hrac.vy) * .3;
+  }
+  if (hrac.y < STROP + hrac.r){
+    hrac.y = STROP + hrac.r;
+    if (gravSmer === -1){ hrac.vy = 140; zasah('AU, STROP!', true); }
+    else hrac.vy = 60;
+  }
+
+  // --- kukuřičné pole ---
+  if (pole > 0){
+    pole -= dt;
+    poleSpawn -= dt;
+    if (poleSpawn <= 0){
+      poleSpawn = .19;
+      poleFaze += .55;
+      prekazky.push({ typ:'zrno', x: Š + 40, y: omez(V/2 - 40 + Math.sin(poleFaze) * 135, 90, ZEM - 70),
+                      r: 15, faze: nah(0, 7) });
+      if (Math.random() < .55)
+        prekazky.push({ typ:'steblo', x: Š + 40 + nah(0, 70), v: nah(70, 105), faze: nah(0, 7) });
+    }
+    if (!poleStrasak && pole < 2.7){               // uprostřed pole stojí strašák
+      poleStrasak = true;
+      prekazky.push({ typ:'strasak', x: Š + 120, v: nah(140, 172), faze: nah(0, 7),
+                      nejbliz: 9999, bod:false });
+    }
+    if (pole <= 0) poleCas = nah(40, 54);
+  } else if (!boss && bourka <= 0){
+    poleCas -= dt;
+    if (poleCas <= 0){
+      pole = 4.8; poleSpawn = 0; poleFaze = 0; poleStrasak = false;
+      spawnCas = Math.max(spawnCas, 5.4);          // chvíli žádné překážky, jen kukuřice
+      popisek(Š/2, 170, 'KUKUŘIČNÉ POLE!', '#ffe066');
+      zvuk.bonus();
+    }
+  }
+
+  // --- boss ---
+  if (!boss && demonSila() > .5) bossCas = Math.min(bossCas, 4);   // v pekle jedna za druhou
+  if (!boss){
+    bossCas -= dt;
+    if (bossCas <= 0) novyBoss();
+  } else bossKrok(boss, dt);
+
+  // --- výroba překážek (během bosse pauza) ---
+  if (!boss){
+    spawnCas -= dt;
+    if (spawnCas <= 0){
+      vyrobPrekazku();
+      spawnCas = (omez(1.55 / obtiznost, .78, 1.55) + nah(0, .25)) * (1 - demonSila() * .3);
+    }
+  }
+  // pírko lítá pořád, během bosse častěji
+  pirkoCas -= dt;
+  if (pirkoCas <= 0){ novyBonus(); pirkoCas = (boss ? 7 : nah(14, 20)) * (1 - demonSila() * .45); }
+
+  // --- pohyb překážek ---
+  for (const p of prekazky){
+    if (p.typ === 'netopyr') netopyrKrok(p, dt);
+    else if (p.typ === 'vejce'){
+      p.vy += 300 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.uhel += dt * 4;
+      if (p.y > ZEM - 8){                       // plesk o zem
+        p.y = ZEM - 8; p.rozbite = true;
+      }
+    }
+    else if (p.typ === 'vlna'){ p.x -= (rychlost + 165) * dt; p.faze += dt * 9; }
+    else if (p.typ === 'pavoucek'){
+      p.x -= rychlost * dt; p.y += p.vy * dt; p.faze += dt * 8;
+      if (p.y > p.dolni){ p.y = p.dolni; p.vy = -Math.abs(p.vy) * .9; }
+      if (p.y < p.horni){ p.y = p.horni; p.vy = Math.abs(p.vy); }
+    }
+    else if (p.typ === 'kruh'){ p.x += p.vx * dt; p.faze += dt * 5; }
+    else if (p.typ === 'koule'){
+      p.x += p.vx * dt; p.faze += dt * 4;
+      p.y += Math.sin(p.faze * .8) * 22 * dt;
+      if (Math.random() < .7)
+        castice.push({x: p.x + nah(-14, 30), y: p.y + nah(-20, 20), vx: nah(30, 160), vy: nah(-60, 60),
+                      zivot: nah(.25, .6), max: .6, barva: nahZ(['#ff7a2f','#ffd166','#e63946']), vel: nah(5, 11)});
+    }
+    else if (p.typ === 'strela'){
+      p.x += p.vx * dt; p.faze += dt * 12;
+      if (p.ohniva && Math.random() < .5)
+        castice.push({x: p.x, y: p.y, vx: nah(-30, 90), vy: nah(-40, 40), zivot: nah(.15, .35),
+                      max: .35, barva: nahZ(['#ff7a2f','#ffd166']), vel: nah(3, 5)});
+    }
+    else if (p.typ === 'sit'){ p.x -= rychlost * dt; p.faze += dt * 2; }
+    else p.x -= rychlost * dt;
+    if (p.typ === 'pila'){
+      p.uhel += dt * 9;
+      p.y = p.zaklad + Math.sin(hodiny * p.tempo * 2 + p.faze) * p.amp;
+    }
+    if (p.typ === 'zrno' || p.typ === 'pirko') p.faze += dt * 5;
+  }
+
+  if (kamarad) kamaradKrok(kamarad, dt);
+
+  // --- kostlivá slepice se přidá tomu, kdo přežil tři pekla ---
+  if (!kostlivec && statPeklo >= 3){
+    kostlivec = { x: hrac.x - 70, y: hrac.y + 40, vx: 0, vy: 0, faze: 0 };
+    popisek(Š/2, 210, 'KOSTLIVÁ SLEPICE SE PŘIDALA!', '#f0ece0');
+    zvuk.vyhraDuha();
+  }
+  if (kostlivec) kostlivecKrok(kostlivec, dt);
+
+  // --- duch, co se odlepí od kopce a jde po tobě ---
+  const nocS = nocSila(), demS = demonSila();
+  if (!honic && !boss && (nocS > .5 || demS > .5)){
+    honicCas -= dt;
+    if (honicCas <= 0){
+      honic = { x: -60, y: hrac.y, faze: nah(0, 7), demon: demS > .5 };
+      popisek(Š/2, 170, honic.demon ? 'PEKELNÝ DUCH TĚ HONÍ!' : 'BUHÚÚ! DUCH TĚ HONÍ!',
+              honic.demon ? '#ff8f6b' : '#d6f2ff');
+      zvuk.hrom();
+    }
+  }
+  if (honic) honicKrok(honic, dt, nocS, demS);
+
+  // --- svítící očka mezi kukuřicí ---
+  if (pole > 0 && (nocS > .3 || demS > .3) && Math.random() < dt * 3.4)
+    POLE_OCI.push({ x: Š + 40, y: nah(120, ZEM - 60), mrk: nah(.8, 2.6), demon: demS > .3 });
+  for (let i = POLE_OCI.length - 1; i >= 0; i--){
+    const o = POLE_OCI[i];
+    o.x -= rychlost * dt;
+    o.mrk -= dt;
+    if (o.mrk < -.2) o.mrk = nah(1, 3);
+    if (o.x < -60) POLE_OCI.splice(i, 1);
+  }
+
+  // --- srážky ---
+  const r = hrac.r;
+  for (let i = prekazky.length - 1; i >= 0; i--){
+    const p = prekazky[i];
+
+    if (p.typ === 'trubka'){
+      const rt = r * .82;                       // o něco menší dotyk = těsné průlety projdou
+      const dy = dvojceY();
+      const doTrubky = (yy) => kruhBox(hrac.x, yy, rt, p.x, -20, p.š, p.mezeraY + 20) ||
+                               kruhBox(hrac.x, yy, rt, p.x, p.mezeraY + p.mezeraV, p.š, ZEM);
+      const trefa = doTrubky(hrac.y) || (dy !== null && doTrubky(dy));
+      if (trefa){
+        if (turbo > 0){ rozbij(p, i, {x:p.x + p.š/2, y:hrac.y}); continue; }
+        zasah('TŘESK!', true);                  // do trubky = konec, jako v opravdovém Flappy
+      }
+      if (!p.bod && p.x + p.š < hrac.x){ p.bod = true; pripisBod(p.bonus ? 5 : 1, !!p.bonus); }
+
+    } else if (p.typ === 'pila'){
+      const dyP = dvojceY();
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r - 6 ||
+          (dyP !== null && Math.hypot(hrac.x - p.x, dyP - p.y) < r + p.r - 6)){
+        if (turbo > 0){ rozbij(p, i, p); continue; }
+        zasah('PILA!');
+      }
+      if (!p.bod && p.x + p.r < hrac.x){ p.bod = true; pripisBod(1); }
+
+    } else if (p.typ === 'ostny'){
+      let trefa = false;
+      if (p.kde !== 'nahore') trefa = trefa || kruhBox(hrac.x, hrac.y, r*.85, p.x, ZEM - p.v, p.š, p.v);
+      if (p.kde !== 'dole')   trefa = trefa || kruhBox(hrac.x, hrac.y, r*.85, p.x, STROP, p.š, p.v);
+      if (trefa){
+        if (turbo > 0){ rozbij(p, i, {x:p.x + p.š/2, y:hrac.y}); continue; }
+        zasah('OSTNY!');
+      }
+      if (!p.bod && p.x + p.š < hrac.x){ p.bod = true; pripisBod(1); }
+
+    } else if (p.typ === 'netopyr'){
+      if (p.stav !== 'zdrha' && Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r - 13){
+        if (turbo > 0){ rozbij(p, i, p); continue; }
+        zasah('NETOPÝR!');
+        p.stav = 'zdrha'; p.vy = -300; p.ublizil = true;
+      }
+      if (!p.bod && p.x + p.r < hrac.x){
+        p.bod = true; pripisBod(1);
+        if (!p.ublizil){
+          netopyrPresel++;
+          if (netopyrPresel >= 3 && !kamarad){        // třetí přeletěný se přidá k tobě
+            kamarad = { x: p.x, y: p.y, vx: 0, vy: 0, faze: 0 };
+            prekazky.splice(i, 1);
+            popisek(hrac.x, hrac.y - 52, 'KAMARÁD!', '#ffb3c6');
+            bum(p.x, p.y, '#ffb3c6', 22, 280);
+            zvuk.bossKonec();
+            continue;
+          }
+        }
+      }
+
+    } else if (p.typ === 'vejce'){
+      if (p.rozbite){
+        bum(p.x, p.y, p.zlate ? '#ffd166' : '#fff8dc', p.zlate ? 16 : 10, 200);
+        zvuk.plack();
+        prekazky.splice(i, 1); continue;
+      }
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r + (p.zlate ? 8 : -3)){
+        if (p.zlate){                                  // zlaté vejce nikdy neublíží
+          prekazky.splice(i, 1);
+          bum(p.x, p.y, '#ffd166', 22, 320);
+          if (turbo > 0 && hrac.zivoty < 3){
+            hrac.zivoty++;
+            popisek(hrac.x, hrac.y - 44, '+1 SRDÍČKO!', '#ff9fb0');
+            zvuk.bossKonec();
+          } else {
+            skore += 10;
+            popisek(hrac.x, hrac.y - 40, '+10 ZLATÉ!', '#ffd166');
+            zvuk.bonus();
+          }
+          zatres(5);
+          continue;
+        }
+        if (turbo > 0){ rozbij(p, i, p); continue; }
+        zasah('VEJCE!');
+        prekazky.splice(i, 1); continue;
+      }
+      if (!p.bod && p.x < hrac.x - 20 && !p.zlate){ p.bod = true; pripisBod(1); }
+
+    } else if (p.typ === 'portal'){
+      if (!p.bod && p.x < hrac.x){
+        p.bod = true;
+        if (p.druh === 'zmenseni'){
+          maly = 9; hrac.r = 9;
+          popisek(hrac.x, hrac.y - 54, 'MALÁ SLEPICE!', '#8ce99a');
+          for (let q = 0; q < 3; q++) bum(hrac.x, hrac.y + nah(-25, 25), '#8ce99a', 12, 300);
+          zvuk.portal(false);
+        } else if (p.druh === 'dvojce'){
+          dvojce = 9;
+          popisek(hrac.x, hrac.y - 54, 'DVĚ SLEPICE!', '#ff8fb1');
+          for (let q = 0; q < 3; q++) bum(hrac.x, hrac.y + nah(-25, 25), '#ff8fb1', 12, 320);
+          zvuk.portal(true);
+        } else if (p.druh === 'rychlost'){
+          zrychleniCas = 5;
+          popisek(hrac.x, hrac.y - 54, 'ZRYCHLENÍ!', '#ff9f1c');
+          for (let q = 0; q < 3; q++) bum(hrac.x, hrac.y + nah(-25, 25), '#ff9f1c', 12, 340);
+          zvuk.portal(true); hudbaTed();
+        } else {
+          gravSmer = -gravSmer;
+          hrac.vy = MAV * gravSmer * .5;                // malé žduchnutí správným směrem
+          popisek(hrac.x, hrac.y - 54,
+                  gravSmer === -1 ? 'GRAVITACE NAHORU!' : 'GRAVITACE ZPÁTKY!',
+                  gravSmer === -1 ? '#c58cff' : '#74d4ff');
+          for (let q = 0; q < 3; q++)
+            bum(hrac.x, hrac.y + nah(-30, 30), gravSmer === -1 ? '#c58cff' : '#74d4ff', 14, 320);
+          zvuk.portal(gravSmer === -1);
+        }
+        zablesk = .3; zatres(8);
+        statPortaly++;
+        pripisBod(1);
+      }
+
+    } else if (p.typ === 'strasak'){
+      const vrsek = ZEM - p.v;
+      if (Math.abs(p.x - hrac.x) < 150)
+        p.nejbliz = Math.min(p.nejbliz, Math.hypot(hrac.x - p.x, hrac.y - vrsek));
+      if (kruhBox(hrac.x, hrac.y, r * .9, p.x - 15, vrsek, 30, p.v)){
+        if (turbo > 0){ rozbij(p, i, {x: p.x, y: vrsek}); continue; }
+        zasah('SLÁMA!');
+      }
+      if (!p.bod && p.x + 20 < hrac.x){
+        p.bod = true;
+        if (p.nejbliz < 78){                       // proletěl jsi mu těsně kolem klobouku
+          skore += 5; kombo++;
+          popisek(hrac.x, hrac.y - 48, 'TĚSNĚ! +5', '#ffd166');
+          bum(p.x, vrsek, '#ffd166', 14, 240);
+          zvuk.bonus();
+        } else pripisBod(1);
+      }
+
+    } else if (p.typ === 'zrno'){
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r + 6){
+        prekazky.splice(i, 1);
+        zrnka++; skore += 3;
+        bum(p.x, p.y, '#ffd166', 12, 200);
+        if (boss && boss.typ === 'vlk' && naboje < 3){
+          naboje++;
+          popisek(p.x, p.y - 24, 'KUKUŘICE ' + naboje + '/3', '#ffe066');
+        } else popisek(p.x, p.y - 22, '+3', '#ffe066');
+        zvuk.zrno();
+        continue;
+      }
+
+    } else if (p.typ === 'pirko'){
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r + 8){ seberPirko(p, i); continue; }
+
+    } else if (p.typ === 'vlna'){
+      const y0 = p.kde === 'zem' ? ZEM - p.v : p.y - p.v/2;
+      if (kruhBox(hrac.x, hrac.y, r * .8, p.x - 24, y0, 48, p.v)){
+        if (turbo > 0){ bum(p.x, hrac.y, '#c9a0ff', 20, 300); prekazky.splice(i, 1); continue; }
+        zasah('ZVUKOVÁ VLNA!');
+        bum(p.x, hrac.y, '#c9a0ff', 16, 280);
+        prekazky.splice(i, 1); continue;
+      }
+
+    } else if (p.typ === 'pavoucek'){
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r - 6){
+        if (turbo > 0){ rozbij(p, i, p); continue; }
+        zasah('PAVOUČEK!');
+        prekazky.splice(i, 1); continue;
+      }
+
+    } else if (p.typ === 'sit'){
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r - 10){
+        prekazky.splice(i, 1);
+        if (turbo > 0){ bum(p.x, p.y, '#e8f7ff', 18, 300); continue; }
+        lepkavy = 2.4;
+        popisek(hrac.x, hrac.y - 42, 'PAVUČINA!', '#d6f2ff');
+        bum(p.x, p.y, '#e8f7ff', 16, 240);
+        zvuk.tuk();
+        continue;
+      }
+
+    } else if (p.typ === 'strela'){
+      if (p.vraceno){                                   // letí zpátky na lišku
+        if (boss && boss.typ === 'liska' && boss.stav === 'utoci' && p.x > boss.x - 84){
+          bossZasah(boss);
+          bum(boss.x - 60, boss.y, '#fff3c4', 24, 360);
+          prekazky.splice(i, 1); continue;
+        }
+      } else if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r - 3){
+        if (turbo > 0){                                 // s turbem ji odpálíš zpátky
+          p.vraceno = true; p.vx = 720; p.faze = 0;
+          bum(p.x, p.y, '#ffd166', 16, 300);
+          popisek(p.x, p.y - 34, 'ODPÁLENO!', '#ffe066');
+          zvuk.pukanec(); zatres(5);
+          continue;
+        }
+        prekazky.splice(i, 1);
+        bum(p.x, p.y, '#fff3c4', 14, 260);
+        zasah(p.ohniva ? 'OHNIVÝ POPCORN!' : 'POPCORN!');
+        continue;
+      }
+
+    } else if (p.typ === 'koule'){
+      if (Math.hypot(hrac.x - p.x, hrac.y - p.y) < r + p.r - 8){
+        if (turbo > 0){
+          bum(p.x, p.y, '#ffd166', 34, 460); bum(p.x, p.y, '#ff7a2f', 24, 380);
+          popisek(p.x, p.y - 50, 'ROZBITÁ!', '#ffe066');
+          zatres(14); zvuk.bossAu();
+          prekazky.splice(i, 1); continue;
+        }
+        zasah('OHNIVÁ KOULE!');
+        prekazky.splice(i, 1); continue;
+      }
+
+    } else if (p.typ === 'kruh'){
+      // kruh je jako obruč: vadí jen ve chvíli, kdy jeho rovinou prolétáš
+      const dx = Math.abs(hrac.x - p.x), dy = Math.abs(hrac.y - p.y);
+      if (!p.vraceno){
+        if (dx < 18 + r){
+          if (dy < p.dira - r * .5){                 // trefil jsi díru = projdeš
+            if (turbo > 0 && boss && boss.typ === 'kohout' && boss.stav === 'utoci'){
+              p.vraceno = true; p.vx = 660;
+              popisek(p.x, p.y - 50, 'VRÁTIL JSI MU TO!', '#ffd166');
+              bum(p.x, p.y, '#ffd166', 22, 340);
+              zvuk.turbo(); zatres(7);
+            }
+          } else if (dy < p.r + r * .6){             // narazil jsi do ohnivé obruče
+            if (turbo > 0){ bum(p.x, p.y, '#ff7a2f', 22, 320); prekazky.splice(i, 1); continue; }
+            zasah('OHNIVÝ KRUH!');
+            prekazky.splice(i, 1); continue;
+          }
+        }
+      } else if (boss && boss.stav === 'utoci' && p.x > boss.x - 100){
+        bossZasah(boss);
+        bum(boss.x, boss.y, '#ff7a2f', 26, 380);
+        prekazky.splice(i, 1); continue;
+      }
+    }
+
+    if (p.x < -240 || p.x > Š + 420 || p.y > V + 120) prekazky.splice(i, 1);
+  }
+
+  // --- srážka s bossem ---
+  if (boss && boss.stav !== 'odlet'){
+    const b = boss;
+    if (b.typ === 'liska'){
+      if (kruhBox(hrac.x, hrac.y, r, b.x - 74, b.y - 40, 148, 80)){
+        if (turbo > 0 && b.stav !== 'zasazena') bossZasah(b);
+        else zasah('LETADLO!');
+      }
+
+    } else if (b.typ === 'vlk'){
+      // shodíš mu kukuřici do bubnu — proleť těsně nad ním
+      if (b.stav === 'utoci' && naboje > 0 &&
+          Math.abs(hrac.x - (b.x - 26)) < 52 && hrac.y > b.y - 120 && hrac.y < b.y - 26){
+        naboje--;
+        popisek(b.x - 26, b.y - 70, 'KUKUŘICE DO BUBNU!', '#ffe066');
+        bum(b.x - 26, b.y - 30, '#ffd166', 24, 320);
+        bossZasah(b);
+      }
+      if (kruhBox(hrac.x, hrac.y, r * .9, b.x - 46, b.y - 26, 96, 62)){
+        if (turbo > 0 && b.stav !== 'zasazena') bossZasah(b);
+        else zasah('VLK!');
+      }
+
+    } else if (b.typ === 'pavouk'){
+      // s turbem přeletíš její vlákna a přestřihneš je
+      if (b.stav === 'utoci' && turbo > 0){
+        for (let k = 0; k < b.zivoty; k++){
+          const vx = b.x - 62 + k * 62;
+          if (Math.abs(hrac.x - vx) < 18 && hrac.y > b.y + 20 && hrac.y < 350){
+            popisek(vx, hrac.y - 40, 'PŘESTŘIŽENO!', '#a0ffc9');
+            bum(vx, hrac.y, '#d6f2ff', 20, 300);
+            zvuk.rez();
+            bossZasah(b);
+            break;
+          }
+        }
+      }
+      if (Math.hypot(hrac.x - b.x, hrac.y - b.y) < r + 42){
+        if (turbo > 0 && b.stav !== 'zasazena') bossZasah(b);
+        else zasah('PAVOUČÍ KRÁLOVNA!');
+      }
+
+    } else if (b.typ === 'kohout'){
+      if (kruhBox(hrac.x, hrac.y, r * .9, b.x - 52, b.y - 74, 112, 150)){
+        if (turbo > 0 && b.stav !== 'zasazena') bossZasah(b);
+        else zasah('KOHOUT!');
+      }
+    }
+  }
+}
+
+// ============ KRESLENÍ ============
+// Všechno je kreslené tvary — žádné emoji, takže to vypadá stejně všude.
+
+let posunHory = 0, posunStromy = 0;
+
+// --- malé pomůcky ---
+// stín, který se zmenšuje a světlá, jak je věc vysoko nad zemí
+function stinLetu(x, y, r, sila = 1){
+  const t = omez((ZEM - y) / (ZEM - 60), 0, 1);
+  stinPod(x - 10, ZEM + 5, r * (1.15 - t * .45), (.26 - t * .16) * sila);
+}
+function stinPrekazky(p){
+  switch (p.typ){
+    case 'trubka':
+      stinPod(p.x + p.š * .35, ZEM + 5, p.š * .8, p.bonus ? .16 : .2);
+      break;
+    case 'pila':    stinLetu(p.x, p.y, p.r * 1.05); break;
+    case 'ostny':
+      stinPod(p.x + p.š * .4, ZEM + 5, p.š * .55, p.kde === 'nahore' ? .1 : .16);
+      break;
+    case 'netopyr': stinLetu(p.x, p.y, 20, .9); break;
+    case 'zrno':    stinLetu(p.x, p.y, 11, .8); break;
+    case 'pirko':   stinLetu(p.x, p.y, 14, .8); break;
+    case 'vejce':   stinLetu(p.x, p.y, 12, .8); break;
+    case 'strela':  stinLetu(p.x, p.y, 10, .7); break;
+    case 'koule':   stinLetu(p.x, p.y, 30, 1.1); break;
+    case 'pavoucek':stinLetu(p.x, p.y, 12, .8); break;
+    case 'strasak': stinPod(p.x + 6, ZEM + 5, 30, .22); break;
+    case 'portal':  stinPod(p.x, ZEM + 5, 26, .14); break;
+  }
+}
+
+function stinPod(x, y, rx, a = .22){
+  ctx.fillStyle = 'rgba(0,0,0,' + a + ')';
+  ctx.beginPath(); ctx.ellipse(x, y, rx, rx*.3, 0, 0, 7); ctx.fill();
+}
+function srdce(x, y, s, barva){
+  ctx.fillStyle = barva;
+  ctx.beginPath();
+  ctx.moveTo(x, y + s*.85);
+  ctx.bezierCurveTo(x - s*1.35, y - s*.25, x - s*.55, y - s*1.15, x, y - s*.35);
+  ctx.bezierCurveTo(x + s*.55, y - s*1.15, x + s*1.35, y - s*.25, x, y + s*.85);
+  ctx.fill();
+}
+function napis(text, x, y, barva, font, obrys = 5, obrysBarva = 'rgba(20,20,30,.62)'){
+  ctx.font = font;
+  ctx.globalAlpha = 1;
+  if (obrys){ ctx.lineWidth = obrys; ctx.strokeStyle = obrysBarva; ctx.lineJoin = 'round'; ctx.strokeText(text, x, y); }
+  ctx.fillStyle = barva;
+  ctx.fillText(text, x, y);
+}
+function obdelnikR(x, y, š, v, r, vypln, obrys = null, sila = 2){
+  ctx.beginPath(); ctx.roundRect(x, y, š, v, r);
+  if (vypln){ ctx.fillStyle = vypln; ctx.fill(); }
+  if (obrys){ ctx.lineWidth = sila; ctx.strokeStyle = obrys; ctx.stroke(); }
+}
+
+// ============ POZADÍ ============
+const KOPCE_STROMY = [
+  {m:1.00, jehl:false}, {m:.78, jehl:true},  {m:1.15, jehl:false},
+  {m:.85, jehl:false},  {m:1.05, jehl:true}, {m:.72, jehl:false}, {m:.95, jehl:true}
+];
+const TRSY = [4, 9, 6, 12, 5, 8, 14, 7, 10, 6];
+const CYKLUS = 130;                     // den → západ → noc → peklo → svítání → den
+const NEBE_FAZE = [
+  {t:0,   a:'#3f9bd6', b:'#7cc6ea', c:'#c6ecf8', tma:0},
+  {t:.26, a:'#3f9bd6', b:'#7cc6ea', c:'#c6ecf8', tma:0},
+  {t:.38, a:'#33407e', b:'#ff8c5a', c:'#ffd6a5', tma:.25},
+  {t:.52, a:'#070c22', b:'#141f45', c:'#293a68', tma:.6},
+  {t:.66, a:'#12000a', b:'#3d0410', c:'#6b0f16', tma:.62},
+  {t:.78, a:'#20010c', b:'#6e0c18', c:'#c4381c', tma:.5},
+  {t:.88, a:'#3a3a7a', b:'#c96a6a', c:'#ffc38a', tma:.22},
+  {t:1,   a:'#3f9bd6', b:'#7cc6ea', c:'#c6ecf8', tma:0}
+];
+function cyklFaze(){
+  if (stav === 'menu') return 0;
+  const f = (((hodiny + cyklPosun) % CYKLUS) + CYKLUS) % CYKLUS;
+  return f / CYKLUS;
+}
+function nocSila(){   return omez(1 - Math.abs(cyklFaze() - .54) / .16, 0, 1); }
+function demonSila(){ return omez(1 - Math.abs(cyklFaze() - .72) / .13, 0, 1); }
+function nebeTed(){
+  const f = cyklFaze();
+  let i = 0;
+  while (i < NEBE_FAZE.length - 2 && f > NEBE_FAZE[i+1].t) i++;
+  const A = NEBE_FAZE[i], B = NEBE_FAZE[i+1];
+  const t = omez((f - A.t) / (B.t - A.t), 0, 1);
+  return { a: mixBarev(A.a, B.a, t), b: mixBarev(A.b, B.b, t), c: mixBarev(A.c, B.c, t),
+           tma: A.tma + (B.tma - A.tma) * t };
+}
+const JISKRY = Array.from({length: 34}, () => ({x: nah(0, 960), y: nah(120, 500), f: nah(0, 7),
+                                                r: nah(1.6, 3.4), s: nah(20, 60)}));
+const KERE   = [0, 34, 12, 50, 22, 44, 8, 38, 26, 16, 30, 6];
+
+// --- strašidelná havěť, co pobíhá po kopcích v noci a v pekle ---
+const STRASIDLA = [];
+function novaStrasidla(){
+  STRASIDLA.length = 0;
+  const druhy = ['duch','duch','ocka','bludicka','certik','certik','kostlivec','ocka',
+                 'bludicka','duch','certik','ocka','kostlivec','certik','duch','bludicka'];
+  for (const d of druhy)
+    STRASIDLA.push({ druh: d, x: nah(-100, Š + 700), faze: nah(0, 7),
+                     beh: d === 'certik' ? nah(34, 70) : d === 'kostlivec' ? nah(45, 85)
+                        : d === 'duch' ? nah(8, 24) : 0,
+                     mrk: nah(1, 4), vel: nah(1.35, 1.95) });
+}
+novaStrasidla();
+function vyskaKopce(sx){ return ZEM - 74 - Math.sin((sx + posunKopcu) / 110) * 40; }
+const KAMENY = [18, 52, 9, 40, 27, 60, 14, 33];
+function kresliStrasidlo(st, y, sila, demon){
+  ctx.save();
+  ctx.globalAlpha = sila * .92;
+  ctx.translate(st.x, y);
+  ctx.scale(st.vel, st.vel);
+
+  if (st.druh === 'kostlivec'){                  // --- kostlivá slepice, běží jen v pekle ---
+    const skok = Math.abs(Math.sin(st.faze * 2.4)) * 6;
+    ctx.translate(0, -skok);
+    const K = 'rgba(240,236,224,.95)', T = 'rgba(40,20,24,.9)';
+    ctx.strokeStyle = T; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    for (const sg of [-1, 1]){                                        // běžící nožky
+      const f = Math.sin(st.faze * 5 + (sg > 0 ? 3.14 : 0)) * 8;
+      ctx.beginPath(); ctx.moveTo(sg * 3, -6); ctx.lineTo(sg * 3 + f, 8); ctx.stroke();
+      ctx.strokeStyle = K; ctx.lineWidth = 2.6; ctx.stroke();
+      ctx.strokeStyle = T; ctx.lineWidth = 4.5;
+    }
+    ctx.fillStyle = T;                                                // tělo (obrys)
+    ctx.beginPath(); ctx.ellipse(0, -18, 15, 12, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = K;
+    ctx.beginPath(); ctx.ellipse(0, -18, 12.5, 9.5, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(40,20,24,.45)'; ctx.lineWidth = 1.6;      // žebra
+    for (const rx of [-5, 0, 5]){ ctx.beginPath(); ctx.moveTo(rx, -25); ctx.lineTo(rx, -11); ctx.stroke(); }
+    ctx.fillStyle = T;                                                // lebka
+    ctx.beginPath(); ctx.arc(-13, -32, 10, 0, 7); ctx.fill();
+    ctx.fillStyle = K;
+    ctx.beginPath(); ctx.arc(-13, -32, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ff7a2f';                                        // svítící oční jamky
+    ctx.beginPath(); ctx.arc(-16, -33, 2.6, 0, 7); ctx.arc(-9, -33, 2.4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffb347';                                        // zobák
+    ctx.beginPath(); ctx.moveTo(-21, -31); ctx.lineTo(-31, -28); ctx.lineTo(-21, -26);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = K; ctx.lineWidth = 3;                           // kostěný ocásek
+    ctx.beginPath(); ctx.moveTo(13, -22); ctx.lineTo(24, -30); ctx.stroke();
+
+  } else if (st.druh === 'duch'){                // --- duch ---
+    const bob = Math.sin(st.faze * .9) * 7;
+    ctx.translate(0, bob - 26);
+    const g = ctx.createRadialGradient(0, -4, 3, 0, 0, 30);
+    g.addColorStop(0, 'rgba(220,240,255,.32)'); g.addColorStop(1, 'rgba(220,240,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 30, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(244,252,255,.95)';
+    ctx.beginPath();
+    ctx.moveTo(-13, 6);
+    ctx.quadraticCurveTo(-13, -20, 0, -20);
+    ctx.quadraticCurveTo(13, -20, 13, 6);
+    for (let i = 0; i < 4; i++){                 // vlnitý spodek
+      const x1 = 13 - i * 6.5, x2 = 13 - (i + .5) * 6.5;
+      ctx.quadraticCurveTo(x2, 6 + (i % 2 ? -6 : 6) + Math.sin(st.faze * 3 + i) * 2, x1 - 6.5, 6);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,170,210,.7)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(30,40,70,.9)';         // očka a pusa
+    ctx.beginPath(); ctx.ellipse(-4.5, -7, 2.6, 3.4, 0, 0, 7); ctx.ellipse(4.5, -7, 2.6, 3.4, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, 3, 2.4, 0, 0, 7); ctx.fill();
+
+  } else if (st.druh === 'certik'){              // --- čertík s vidlemi ---
+    const skok = Math.abs(Math.sin(st.faze * 2)) * 5;
+    ctx.translate(0, -skok);
+    const zg = ctx.createRadialGradient(0, -22, 4, 0, -22, 34);              // rudá aura
+    zg.addColorStop(0, 'rgba(255,80,30,.28)'); zg.addColorStop(1, 'rgba(255,80,30,0)');
+    ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(0, -22, 34, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(28,4,8,.96)';
+    ctx.beginPath(); ctx.ellipse(0, -14, 10, 13, 0, 0, 7); ctx.fill();         // tělo
+    ctx.beginPath(); ctx.arc(0, -28, 9, 0, 7); ctx.fill();                     // hlava
+    for (const sg of [-1, 1]){                                                 // rohy
+      ctx.beginPath(); ctx.moveTo(sg*3, -34); ctx.lineTo(sg*8, -45); ctx.lineTo(sg*9, -32);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(24,6,10,.9)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (const sg of [-1, 1]){                                                 // běžící nohy
+      const f = Math.sin(st.faze * 4 + (sg > 0 ? 3.14 : 0)) * 6;
+      ctx.beginPath(); ctx.moveTo(sg * 3, -4); ctx.lineTo(sg * 3 + f, 6); ctx.stroke();
+    }
+    ctx.beginPath();                                                            // ocásek
+    ctx.moveTo(8, -16); ctx.quadraticCurveTo(20, -14 + Math.sin(st.faze*3)*4, 16, -26); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-9, -18); ctx.lineTo(-19, -34); ctx.stroke();   // vidle
+    ctx.beginPath(); ctx.moveTo(-23, -30); ctx.lineTo(-16, -38); ctx.moveTo(-19, -28); ctx.lineTo(-12, -36);
+    ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#ff7a2f';                                                  // svítící očka
+    ctx.beginPath(); ctx.arc(-3, -29, 2.2, 0, 7); ctx.arc(3.5, -29, 2.2, 0, 7); ctx.fill();
+
+  } else if (st.druh === 'ocka'){                // --- očka v křoví ---
+    const otev = omez(st.mrk < 0 ? 0 : 1, 0, 1);
+    if (otev <= 0){ ctx.restore(); return; }
+    const bar = demon > .4 ? '255,120,40' : '255,225,120';
+    for (const ox of [-6, 6]){
+      const g = ctx.createRadialGradient(ox, -6, 0, ox, -6, 13);
+      g.addColorStop(0, 'rgba(' + bar + ',.85)'); g.addColorStop(1, 'rgba(' + bar + ',0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ox, -6, 13, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(' + bar + ',.95)';
+      ctx.beginPath(); ctx.ellipse(ox, -6, 3.4, 2.6, 0, 0, 7); ctx.fill();
+    }
+
+  } else {                                       // --- bludička ---
+    const bob = Math.sin(st.faze * 1.3) * 16;
+    const bar = demon > .4 ? '255,140,60' : '150,230,255';
+    ctx.translate(0, bob - 40);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 22);
+    g.addColorStop(0, 'rgba(255,255,255,.9)');
+    g.addColorStop(.35, 'rgba(' + bar + ',.55)');
+    g.addColorStop(1, 'rgba(' + bar + ',0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 22, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(0, 0, 3.4, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(' + bar + ',.28)';
+    for (let i = 1; i <= 3; i++){
+      ctx.beginPath();
+      ctx.arc(i * 5, -Math.sin(st.faze * 1.3 - i * .4) * 8 + bob * .2, 3.4 - i * .8, 0, 7);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function tvarKopce(vyska, vlna, delitel, posun, absolutni, faze = 0){
+  ctx.beginPath(); ctx.moveTo(-140, ZEM);
+  for (let x = -140; x <= Š + 380; x += 16){
+    const sn = Math.sin(x / delitel + faze);
+    ctx.lineTo(x - posun, ZEM - vyska - (absolutni ? Math.abs(sn) : sn) * vlna);
+  }
+  ctx.lineTo(Š + 380, ZEM); ctx.closePath();
+}
+const SVETLUSKY = Array.from({length: 26}, () => ({
+  x: nah(0, 960), y: nah(280, 470), f: nah(0, 7), r: nah(1.8, 3.2), s: nah(.6, 1.5)
+}));
+
+function kresliStrom(x, y, m, jehl){
+  ctx.save(); ctx.translate(x, y); ctx.scale(m, m);
+  ctx.fillStyle = '#6b4a2f';
+  ctx.fillRect(-4, -18, 8, 22);
+  if (jehl){
+    for (let i = 0; i < 3; i++){
+      ctx.fillStyle = i % 2 ? '#2f7a45' : '#3a9c53';
+      ctx.beginPath();
+      ctx.moveTo(0, -64 + i*17); ctx.lineTo(-19 + i*2, -26 + i*15); ctx.lineTo(19 - i*2, -26 + i*15);
+      ctx.closePath(); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#3a9c53';
+    ctx.beginPath();
+    ctx.arc(-13, -30, 15, 0, 7); ctx.arc(13, -30, 14, 0, 7); ctx.arc(0, -44, 18, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    ctx.beginPath(); ctx.arc(-6, -48, 11, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function kresliMrak(x, y, m, tma){
+  ctx.save(); ctx.translate(x, y); ctx.scale(m, m);
+  ctx.fillStyle = tma ? 'rgba(226,232,240,.9)' : 'rgba(255,255,255,.92)';
+  ctx.beginPath();
+  ctx.arc(-34, 2, 22, 0, 7); ctx.arc(-8, -12, 28, 0, 7);
+  ctx.arc(22, -2, 22, 0, 7); ctx.arc(40, 6, 16, 0, 7);
+  ctx.ellipse(0, 12, 46, 13, 0, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(160,190,215,.35)';
+  ctx.beginPath(); ctx.ellipse(0, 16, 42, 8, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function kresliPozadi(dt){
+  const v = (stav === 'hra' ? rychlost : 70) * dt;
+  posunHory   = (posunHory   + v * .05) % 480;
+  posunKopcu  = (posunKopcu  + v * .18) % 320;
+  posunStromy = (posunStromy + v * .45) % (150 * KOPCE_STROMY.length);
+  posunZeme   = (posunZeme   + v) % 60;
+
+  // obloha — den → západ → noc → démonická oblast → svítání
+  const nb = nebeTed();
+  const den = nb.tma;                       // jak moc je tma
+  const noc = nocSila();
+  const demon = demonSila();
+  const f = cyklFaze();
+  const o = ctx.createLinearGradient(0, 0, 0, V);
+  o.addColorStop(0, nb.a); o.addColorStop(.55, nb.b); o.addColorStop(1, nb.c);
+  ctx.fillStyle = o; ctx.fillRect(0, 0, Š, V);
+  if (boss){ ctx.fillStyle = 'rgba(18,24,58,.22)'; ctx.fillRect(0, 0, Š, V); }
+  if (bourkaSila > 0){ ctx.fillStyle = 'rgba(38,44,66,' + (.46 * bourkaSila) + ')'; ctx.fillRect(0, 0, Š, V); }
+
+  // hvězdy
+  if (noc > 0){
+    ctx.fillStyle = '#ffffff';
+    for (const h of HVEZDY){
+      ctx.globalAlpha = noc * (.4 + Math.abs(Math.sin(hodiny*1.7 + h.f)) * .6);
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // slunce zapadá a zase vychází
+  let sunT = -1;
+  if (f < .44) sunT = f / .44;
+  else if (f > .86) sunT = 1 - (f - .86) / .14;
+  if (sunT >= 0 && sunT <= 1){
+    const sx = 130 + sunT * 250, sy = 92 + sunT * 330;
+    ctx.globalAlpha = omez((1 - sunT) * 3, 0, 1);
+    const z = ctx.createRadialGradient(sx, sy, 10, sx, sy, 130);
+    z.addColorStop(0, 'rgba(255,226,140,.5)'); z.addColorStop(1, 'rgba(255,226,140,0)');
+    ctx.fillStyle = z; ctx.beginPath(); ctx.arc(sx, sy, 130, 0, 7); ctx.fill();
+    ctx.fillStyle = mixBarev('#fff3c4', '#ff8a4c', sunT);
+    ctx.beginPath(); ctx.arc(sx, sy, 34, 0, 7); ctx.fill();
+    ctx.fillStyle = mixBarev('#ffe27a', '#ff6b4a', sunT);
+    ctx.beginPath(); ctx.arc(sx, sy, 26, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // krvavý měsíc a jiskry v démonické oblasti
+  if (demon > 0){
+    const mx = 700, my = 130;
+    ctx.globalAlpha = demon;
+    const z = ctx.createRadialGradient(mx, my, 12, mx, my, 150);
+    z.addColorStop(0, 'rgba(255,60,40,.5)'); z.addColorStop(1, 'rgba(255,60,40,0)');
+    ctx.fillStyle = z; ctx.beginPath(); ctx.arc(mx, my, 150, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c0261f'; ctx.beginPath(); ctx.arc(mx, my, 54, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(80,10,10,.55)';
+    ctx.beginPath(); ctx.arc(mx - 18, my - 14, 13, 0, 7); ctx.arc(mx + 16, my + 8, 9, 0, 7);
+    ctx.arc(mx - 4, my + 24, 7, 0, 7); ctx.fill();
+    for (const j of JISKRY){
+      j.y -= j.s * dt; j.x -= (12 + j.s * .2) * dt;
+      if (j.y < 40){ j.y = nah(V - 60, V + 40); j.x = nah(0, Š); }
+      if (j.x < -20) j.x = Š + 20;
+      const a = demon * (.35 + Math.abs(Math.sin(hodiny * 3 + j.f)) * .65);
+      const zg = ctx.createRadialGradient(j.x, j.y, 0, j.x, j.y, 12);
+      zg.addColorStop(0, 'rgba(255,180,60,' + (a * .8) + ')');
+      zg.addColorStop(1, 'rgba(255,60,20,0)');
+      ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(j.x, j.y, 12, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,220,150,' + a + ')';
+      ctx.beginPath(); ctx.arc(j.x, j.y, j.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // a vychází měsíc
+  if (noc > 0){
+    const mx = Š - 200, my = 310 - noc * 215;
+    ctx.globalAlpha = noc;
+    const z = ctx.createRadialGradient(mx, my, 8, mx, my, 95);
+    z.addColorStop(0, 'rgba(220,235,255,.4)'); z.addColorStop(1, 'rgba(220,235,255,0)');
+    ctx.fillStyle = z; ctx.beginPath(); ctx.arc(mx, my, 95, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f2f6ff'; ctx.beginPath(); ctx.arc(mx, my, 29, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(188,203,235,.8)';
+    ctx.beginPath(); ctx.arc(mx - 9, my - 7, 6, 0, 7); ctx.arc(mx + 9, my + 4, 4.5, 0, 7);
+    ctx.arc(mx - 2, my + 12, 3.4, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // vzdálené hory — se svahy, sněhem a skalami
+  tvarKopce(120, 120, 190, posunHory, true);
+  ctx.fillStyle = boss ? '#7c9bb5' : '#9fc3d9'; ctx.fill();
+  ctx.save(); ctx.clip();
+  // osvětlené svahy
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  for (let i = -2; i < 12; i++){
+    const x = i * 150 - (posunHory % 150);
+    ctx.beginPath(); ctx.moveTo(x, ZEM); ctx.lineTo(x + 46, ZEM - 300); ctx.lineTo(x + 82, ZEM); ctx.closePath(); ctx.fill();
+  }
+  // stinné svahy
+  ctx.fillStyle = 'rgba(40,70,100,.15)';
+  for (let i = -2; i < 12; i++){
+    const x = i * 150 - (posunHory % 150) + 82;
+    ctx.beginPath(); ctx.moveTo(x, ZEM); ctx.lineTo(x + 30, ZEM - 300); ctx.lineTo(x + 62, ZEM); ctx.closePath(); ctx.fill();
+  }
+  // sníh na vrcholcích
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.fillRect(0, 0, Š, ZEM - 208);
+  ctx.fillStyle = 'rgba(255,255,255,.28)';
+  ctx.fillRect(0, ZEM - 208, Š, 16);
+  ctx.restore();
+
+  // mraky
+  for (const m of mraky){
+    m.x -= m.v * dt * (stav === 'hra' ? 1.4 : .5);
+    if (m.x < -170) { m.x = Š + 170; m.y = nah(40, 230); }
+    kresliMrak(m.x, m.y, m.m, !!boss);
+  }
+
+  // duha po bouřce
+  if (duha > 0){
+    const a = omez(Math.min(duha, 15 - duha) / 2.2, 0, 1) * .55;
+    const cx = Š * .5, cy = ZEM + 210;
+    ctx.lineWidth = 13; ctx.globalAlpha = a;
+    ['#ff5d5d','#ff9f1c','#ffe066','#5ecf6b','#4dabf7','#5c6bff','#a86bff'].forEach((b, i) => {
+      ctx.strokeStyle = b;
+      ctx.beginPath(); ctx.arc(cx, cy, 400 - i * 13, Math.PI * 1.06, Math.PI * 1.94); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // zadní kopec
+  tvarKopce(74, 40, 110, posunKopcu, false);
+  ctx.fillStyle = boss ? '#5f9464' : '#79bf72'; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = 'rgba(255,255,255,.09)'; ctx.fillRect(0, 0, Š, ZEM - 44);   // světlo shora
+  const k1 = Math.floor(posunKopcu / 74);
+  for (let i = -1; i < 15; i++){
+    const idx = (((i + k1) % KERE.length) + KERE.length) % KERE.length;
+    const x = i * 74 - (posunKopcu % 74);
+    const y = ZEM - 14 - KERE[idx] * .5;
+    ctx.fillStyle = 'rgba(28,92,46,.3)';                    // tmavší trsy
+    ctx.beginPath(); ctx.ellipse(x, y, 24, 9, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(46,124,62,.85)';                  // keříky
+    ctx.beginPath();
+    ctx.arc(x + 30, y - 6, 9, 0, 7); ctx.arc(x + 41, y - 3, 7, 0, 7); ctx.arc(x + 22, y - 2, 6, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = idx % 3 === 0 ? 'rgba(255,255,255,.75)' : 'rgba(255,225,120,.8)';   // kytičky
+    ctx.beginPath(); ctx.arc(x + 12, y + 6, 2.2, 0, 7); ctx.arc(x + 52, y + 3, 2, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+
+  // stromy na kopci
+  const rozestup = 150, k = Math.floor(posunStromy / rozestup);
+  for (let i = -1; i <= 8; i++){
+    const idx = (((i + k) % KOPCE_STROMY.length) + KOPCE_STROMY.length) % KOPCE_STROMY.length;
+    const s = KOPCE_STROMY[idx];
+    const x = i * rozestup - (posunStromy % rozestup);
+    kresliStrom(x, ZEM - 22, s.m * .8, s.jehl);
+  }
+
+  // --- strašidla pobíhající po kopci (jen v noci a v pekle) ---
+  ctx.save();
+  if (noc > .06 || demon > .06){
+    for (const st of STRASIDLA){
+      st.x -= ((stav === 'hra' ? rychlost : 70) * .18 + st.beh) * dt;
+      st.faze += dt * 5;
+      st.mrk -= dt;
+      if (st.mrk < -.16) st.mrk = nah(1.4, 4.5);
+      if (st.x < -70){ st.x = Š + nah(40, 420); st.vel = nah(.85, 1.25); }
+      const sila = (st.druh === 'certik' || st.druh === 'kostlivec') ? demon
+                 : st.druh === 'duch' ? noc
+                 : Math.max(noc, demon);
+      if (sila < .06) continue;
+      const sy = vyskaKopce(st.x);
+      if (st.druh === 'certik' || st.druh === 'kostlivec')
+        stinPod(st.x, sy + 6, 13 * st.vel, .26 * sila);
+      else if (st.druh === 'duch')
+        stinPod(st.x, sy + 6, 11 * st.vel, .16 * sila);
+      kresliStrasidlo(st, sy, sila, demon);
+    }
+  }
+  ctx.beginPath(); ctx.restore();
+
+  // přední kopec
+  const pp = posunKopcu * 1.7;
+  tvarKopce(34, 18, 70, pp, false, 2);
+  ctx.fillStyle = boss ? '#487a4e' : '#5aa84e'; ctx.fill();
+  ctx.save(); ctx.clip();
+  // tmavší fleky = nerovnosti
+  const k2 = Math.floor(pp / 88);
+  for (let i = -1; i < 14; i++){
+    const idx = (((i + k2) % KAMENY.length) + KAMENY.length) % KAMENY.length;
+    const x = i * 88 - (pp % 88);
+    ctx.fillStyle = 'rgba(24,80,38,.22)';
+    ctx.beginPath(); ctx.ellipse(x + 20, ZEM - 8 - (idx % 14), 34, 11, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(150,150,150,.5)';                 // kamínky
+    ctx.beginPath(); ctx.ellipse(x + 58, ZEM - 6 - (idx % 9), 7, 4.5, .3, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(120,120,125,.5)';
+    ctx.beginPath(); ctx.ellipse(x + 68, ZEM - 3, 4.5, 3, -.2, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  // trsy trávy přímo na hraně kopce
+  ctx.fillStyle = boss ? '#5b9160' : '#6cc35f';
+  for (let xs = -20; xs <= Š + 20; xs += 13){
+    const y = ZEM - 34 - Math.sin((xs + pp) / 70 + 2) * 18;
+    const h = 6 + ((Math.floor((xs + pp) / 13) % 4) * 2.5);
+    ctx.beginPath();
+    ctx.moveTo(xs, y + 3); ctx.lineTo(xs + 4, y - h); ctx.lineTo(xs + 8, y + 3);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // země
+  const z = ctx.createLinearGradient(0, ZEM, 0, V);
+  z.addColorStop(0, '#a37a4e'); z.addColorStop(1, '#7a5636');
+  ctx.fillStyle = z; ctx.fillRect(0, ZEM, Š, V - ZEM);
+  ctx.fillStyle = '#4f9b45'; ctx.fillRect(0, ZEM, Š, 15);
+  ctx.fillStyle = '#63b955'; ctx.fillRect(0, ZEM, Š, 7);
+  // vrstvy hlíny a kamínky v zemi
+  ctx.fillStyle = 'rgba(90,62,38,.35)'; ctx.fillRect(0, ZEM + 22, Š, 4);
+  ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fillRect(0, ZEM + 15, Š, 3);
+  for (let i = -1; i < 17; i++){
+    const x = i * 60 - (posunZeme % 60);
+    ctx.fillStyle = 'rgba(60,42,26,.35)';
+    ctx.beginPath(); ctx.ellipse(x + 12, ZEM + 31, 6, 3.5, .2, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,210,.12)';
+    ctx.beginPath(); ctx.ellipse(x + 44, ZEM + 19, 9, 3, -.15, 0, 7); ctx.fill();
+  }
+
+  // trsy trávy a kamínky
+  const t = 60, kt = Math.floor(posunZeme / t);
+  for (let i = -1; i <= 17; i++){
+    const idx = (((i + kt) % TRSY.length) + TRSY.length) % TRSY.length;
+    const x = i * t - (posunZeme % t);
+    ctx.fillStyle = '#3f8a3a';
+    for (let j = 0; j < 3; j++){
+      ctx.beginPath();
+      ctx.moveTo(x + j*7, ZEM + 1);
+      ctx.lineTo(x + j*7 + 3, ZEM - TRSY[idx] - j);
+      ctx.lineTo(x + j*7 + 6, ZEM + 1);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,.13)';
+    ctx.beginPath(); ctx.ellipse(x + 34, ZEM + 24 + (idx % 3) * 6, 7, 3, 0, 0, 7); ctx.fill();
+  }
+
+  // krajina se stmívá (obloha zůstává, ať jsou vidět hvězdy)
+  if (den > .1){
+    const cr = Math.round(10 + demon * 80), cg = Math.round(16 - demon * 12), cb = Math.round(46 - demon * 36);
+    const g2 = ctx.createLinearGradient(0, 110, 0, V);
+    g2.addColorStop(0, 'rgba(' + cr + ',' + cg + ',' + cb + ',0)');
+    g2.addColorStop(1, 'rgba(' + cr + ',' + cg + ',' + cb + ',' + ((den - .1) / .9 * .62) + ')');
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, Š, V);
+  }
+  // rozžhavené praskliny v zemi
+  if (demon > 0){
+    const kd = Math.floor(posunZeme / 60);
+    for (let i = -1; i < 17; i++){
+      const idx = (((i + kd) % KAMENY.length) + KAMENY.length) % KAMENY.length;
+      const x = i * 60 - (posunZeme % 60);
+      ctx.globalAlpha = demon * (.5 + Math.sin(hodiny * 3 + i) * .3);
+      ctx.strokeStyle = '#ff7a2f'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x + 6, ZEM + 12 + (idx % 5));
+      ctx.lineTo(x + 22, ZEM + 20 + (idx % 7));
+      ctx.lineTo(x + 38, ZEM + 12 + (idx % 4));
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,220,120,.8)'; ctx.lineWidth = 1.4; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(120,10,14,' + (demon * .22) + ')';
+    ctx.fillRect(0, 0, Š, V);
+  }
+
+  // světlušky — vylétnou, až se setmí
+  if (noc > .18 && demon < .3){
+    for (const sv of SVETLUSKY){
+      sv.x -= (16 + sv.s * 22) * dt * (stav === 'hra' ? 1 : .4);
+      if (sv.x < -24){ sv.x = Š + 24; sv.y = nah(280, 470); }
+      const y = sv.y + Math.sin(hodiny * 1.5 + sv.f * 2) * 16;
+      const a = (noc - .18) / .82 * (.3 + Math.abs(Math.sin(hodiny * 2.4 + sv.f)) * .7);
+      const zg = ctx.createRadialGradient(sv.x, y, 0, sv.x, y, 15);
+      zg.addColorStop(0, 'rgba(255,255,190,' + (a * .8) + ')');
+      zg.addColorStop(1, 'rgba(190,255,130,0)');
+      ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(sv.x, y, 15, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,205,' + a + ')';
+      ctx.beginPath(); ctx.arc(sv.x, y, sv.r, 0, 7); ctx.fill();
+    }
+  }
+}
+
+// ============ PŘEKÁŽKY ============
+function kresliTrubku(p){
+  const b = !!p.bonus;
+  const dem = demonSila();
+  const obr = b ? '#a01f2a' : dem > .3 ? '#2a0d0a' : '#1e5626';
+  const g = ctx.createLinearGradient(p.x, 0, p.x + p.š, 0);
+  if (b){ g.addColorStop(0, '#dcdcdc'); g.addColorStop(.3, '#ffffff');
+          g.addColorStop(.6, '#fdfdfd'); g.addColorStop(1, '#c9c9c9'); }
+  else if (dem > .3){
+    g.addColorStop(0, mixBarev('#2d7a37', '#241014', dem)); g.addColorStop(.28, mixBarev('#5fc16a', '#4a1d18', dem));
+    g.addColorStop(.5, mixBarev('#7ad683', '#6b2a1e', dem)); g.addColorStop(.78, mixBarev('#3f9a49', '#3a1512', dem));
+    g.addColorStop(1, mixBarev('#276b30', '#1a0a0a', dem));
+  }
+  else  { g.addColorStop(0, '#2d7a37'); g.addColorStop(.28, '#5fc16a');
+          g.addColorStop(.5, '#7ad683'); g.addColorStop(.78, '#3f9a49'); g.addColorStop(1, '#276b30'); }
+
+  const telo = (y, v) => {
+    ctx.fillStyle = g; ctx.fillRect(p.x, y, p.š, v);
+    if (b){                                   // červené pruhy
+      ctx.save();
+      ctx.beginPath(); ctx.rect(p.x, y, p.š, v); ctx.clip();
+      ctx.fillStyle = '#e63946';
+      const start = Math.floor(y / 46) * 46;
+      for (let yy = start; yy < y + v; yy += 46) ctx.fillRect(p.x, yy, p.š, 23);
+      ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(p.x + 12, y, 8, v);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,.25)';
+      ctx.fillRect(p.x + 12, y, 8, v);
+    }
+    ctx.strokeStyle = obr; ctx.lineWidth = 3;
+    ctx.strokeRect(p.x + 1.5, y, p.š - 3, v);
+  };
+  const cap = (y) => {
+    const gg = ctx.createLinearGradient(p.x - 9, 0, p.x + p.š + 9, 0);
+    if (b){ gg.addColorStop(0, '#c9901a'); gg.addColorStop(.35, '#ffd166');
+            gg.addColorStop(.6, '#ffe9a8'); gg.addColorStop(1, '#b8801a'); }
+    else  { gg.addColorStop(0, '#256b2e'); gg.addColorStop(.3, '#63c76e');
+            gg.addColorStop(.55, '#84dd8c'); gg.addColorStop(1, '#215f29'); }
+    ctx.beginPath(); ctx.roundRect(p.x - 9, y, p.š + 18, 26, 6);
+    ctx.fillStyle = gg; ctx.fill();
+    ctx.strokeStyle = b ? '#8f6410' : '#1e5626'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.3)';
+    ctx.fillRect(p.x - 2, y + 5, 8, 16);
+    if (b){
+      ctx.textAlign = 'center';
+      napis('5', p.x + p.š/2, y + 13, '#ffffff', 'bold 21px system-ui', 5, '#8f6410');
+    }
+  };
+  telo(-20, p.mezeraY + 20);
+  cap(p.mezeraY - 26);
+  telo(p.mezeraY + p.mezeraV, ZEM - (p.mezeraY + p.mezeraV));
+  cap(p.mezeraY + p.mezeraV);
+
+  // žhavé pukliny v pekelné trubce
+  if (dem > .3 && !b){
+    ctx.globalAlpha = dem * .85;
+    ctx.strokeStyle = '#ff7a2f'; ctx.lineWidth = 2.4;
+    for (const y of [p.mezeraY - 90, p.mezeraY - 190, p.mezeraY + p.mezeraV + 70, p.mezeraY + p.mezeraV + 170]){
+      if (y < 0 || y > ZEM) continue;
+      ctx.beginPath();
+      ctx.moveTo(p.x + 10, y); ctx.lineTo(p.x + 34, y + 16); ctx.lineTo(p.x + 60, y + 4);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // pár lístků, ať to není jen roura
+  ctx.fillStyle = b ? '#ffd166' : dem > .3 ? '#ff8c3a' : '#8ede8f';
+  ctx.beginPath(); ctx.ellipse(p.x - 12, p.mezeraY - 32, 11, 5, -.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(p.x + p.š + 12, p.mezeraY + p.mezeraV + 32, 11, 5, .5, 0, 7); ctx.fill();
+}
+
+function kresliPilu(p){
+  ctx.save(); ctx.translate(p.x, p.y);
+  // úchyt
+  ctx.strokeStyle = 'rgba(60,60,70,.5)'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(0, -p.amp - 30); ctx.lineTo(0, p.amp + 30); ctx.stroke();
+
+  const dem = demonSila();
+  if (dem > .3){                                   // v pekle pila žhne
+    const zg = ctx.createRadialGradient(0, 0, 4, 0, 0, p.r * 2.1);
+    zg.addColorStop(0, 'rgba(255,120,40,' + (dem * .5) + ')');
+    zg.addColorStop(1, 'rgba(255,60,20,0)');
+    ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(0, 0, p.r * 2.1, 0, 7); ctx.fill();
+  }
+  ctx.rotate(p.uhel);
+  const g = ctx.createRadialGradient(-8, -8, 4, 0, 0, p.r);
+  if (dem > .3){ g.addColorStop(0, mixBarev('#f4f7fa', '#ffd166', dem));
+                 g.addColorStop(.6, mixBarev('#c3cad4', '#ff6b2f', dem));
+                 g.addColorStop(1, mixBarev('#8e97a4', '#8c1420', dem)); }
+  else { g.addColorStop(0, '#f4f7fa'); g.addColorStop(.6, '#c3cad4'); g.addColorStop(1, '#8e97a4'); }
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  for (let i = 0; i < 12; i++){
+    const a1 = i / 12 * Math.PI*2, a2 = (i + .5) / 12 * Math.PI*2;
+    ctx.lineTo(Math.cos(a1)*p.r, Math.sin(a1)*p.r);
+    ctx.lineTo(Math.cos(a2)*p.r*.74, Math.sin(a2)*p.r*.74);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#6b7480'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#79828f'; ctx.beginPath(); ctx.arc(0, 0, p.r*.42, 0, 7); ctx.fill();
+  ctx.fillStyle = '#e04f4f'; ctx.beginPath(); ctx.arc(0, 0, p.r*.2, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.65)';
+  ctx.beginPath(); ctx.arc(-p.r*.22, -p.r*.22, p.r*.09, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function kresliOstny(p){
+  const zub = (x, y, š, v, dolu) => {
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + š, y); ctx.lineTo(x + š/2, y + (dolu ? v : -v));
+    ctx.closePath(); ctx.fill();
+    ctx.stroke();
+  };
+  const š = 26, pocet = Math.max(1, Math.floor(p.š / š));
+  const dem = demonSila();
+  ctx.strokeStyle = dem > .3 ? '#5a2016' : '#6b7480'; ctx.lineWidth = 2;
+  if (dem > .3 && Math.random() < .25)             // doutná z nich kouř
+    castice.push({x: p.x + nah(0, p.š), y: (p.kde === 'nahore' ? STROP + p.v : ZEM - p.v),
+                  vx: nah(-90,-20), vy: nah(-60,-15), zivot: nah(.4, .9), max: .9,
+                  barva: nahZ(['#6c757d','#adb5bd','#ff7a2f']), vel: nah(4, 8)});
+
+  const rada = (dolu) => {
+    const y0 = dolu ? STROP : ZEM;
+    const g = ctx.createLinearGradient(0, y0, 0, y0 + (dolu ? p.v : -p.v));
+    if (dem > .3){ g.addColorStop(0, mixBarev('#7f8894', '#3a1410', dem));
+                   g.addColorStop(.45, mixBarev('#dfe5ec', '#ff8c3a', dem));
+                   g.addColorStop(1, mixBarev('#aeb6c2', '#ffe066', dem)); }
+    else { g.addColorStop(0, '#7f8894'); g.addColorStop(.45, '#dfe5ec'); g.addColorStop(1, '#aeb6c2'); }
+    ctx.fillStyle = g;
+    for (let i = 0; i < pocet; i++) zub(p.x + i*š, y0, š, p.v, dolu);
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    for (let i = 0; i < pocet; i++){
+      ctx.beginPath();
+      ctx.moveTo(p.x + i*š + š*.42, y0);
+      ctx.lineTo(p.x + i*š + š*.5, y0 + (dolu ? p.v*.85 : -p.v*.85));
+      ctx.lineTo(p.x + i*š + š*.58, y0);
+      ctx.closePath(); ctx.fill();
+    }
+    // podstavec
+    ctx.fillStyle = '#5c6470';
+    ctx.fillRect(p.x - 3, dolu ? y0 - 8 : y0, pocet*š + 6, 8);
+  };
+  if (p.kde !== 'nahore') rada(false);
+  if (p.kde !== 'dole')   rada(true);
+}
+
+function kresliNetopyra(p){
+  const mav = Math.sin(p.faze);
+  stinPod(p.x, ZEM + 4, 14, .12);
+  ctx.save(); ctx.translate(p.x, p.y);
+
+  // křídla
+  ctx.fillStyle = '#5b4a86';
+  ctx.strokeStyle = '#3b2f5c'; ctx.lineWidth = 2;
+  for (const s of [-1, 1]){
+    ctx.save(); ctx.scale(s, 1);
+    ctx.beginPath();
+    ctx.moveTo(6, -2);
+    ctx.quadraticCurveTo(26, -18 - mav*10, 42, -4 - mav*14);
+    ctx.quadraticCurveTo(34, 4 - mav*4, 30, 10 - mav*6);
+    ctx.quadraticCurveTo(22, 2 - mav*2, 16, 10 - mav*3);
+    ctx.quadraticCurveTo(12, 2, 6, 8);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  // tělo
+  ctx.fillStyle = '#4a3a72';
+  ctx.beginPath(); ctx.ellipse(0, 0, 13, 15, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#33285a'; ctx.lineWidth = 2; ctx.stroke();
+  // uši
+  ctx.fillStyle = '#4a3a72';
+  for (const s of [-1, 1]){
+    ctx.beginPath();
+    ctx.moveTo(s*4, -12); ctx.lineTo(s*10, -26); ctx.lineTo(s*12, -10);
+    ctx.closePath(); ctx.fill();
+  }
+  // oči
+  const zly = p.stav === 'utoci';
+  const oddechuje = p.stav === 'unava';
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-5, -3, 4.4, 0, 7); ctx.arc(5, -3, 4.4, 0, 7); ctx.fill();
+  ctx.fillStyle = zly ? '#e63946' : '#221c33';
+  ctx.beginPath(); ctx.arc(-4.4, -3, 2.4, 0, 7); ctx.arc(5.6, -3, 2.4, 0, 7); ctx.fill();
+  // zoubky
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.moveTo(-3, 6); ctx.lineTo(-1, 11); ctx.lineTo(0, 6); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(2, 6); ctx.lineTo(3.6, 11); ctx.lineTo(5, 6); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // nálada
+  if (p.stav === 'klid') napis('z z', p.x + 22, p.y - 24, '#e8e3ff', 'bold 16px system-ui', 4);
+  else if (oddechuje) napis('uf...', p.x + 26, p.y - 24, '#cfe8ff', 'bold 16px system-ui', 4);
+  else if (p.stav === 'vsiml'){
+    napis('!', p.x + 20, p.y - 26, '#ffe066', 'bold 30px system-ui', 5);
+    ctx.strokeStyle = 'rgba(255,90,90,.55)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 30 + Math.sin(hodiny*20)*4, 0, 7); ctx.stroke();
+  } else if (p.stav === 'zdrha'){
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++){
+      ctx.beginPath(); ctx.moveTo(p.x + 26 + i*8, p.y - 10 + i*10);
+      ctx.lineTo(p.x + 44 + i*8, p.y - 10 + i*10); ctx.stroke();
+    }
+  }
+}
+
+function kresliPortal(p){
+  const gravP = !p.druh || p.druh === 'gravitace';
+  const dolu = !p.doObracene;                 // kam bude gravitace tahat po průletu
+  const A = p.druh === 'zmenseni' ? '#3fd07a' : p.druh === 'rychlost' ? '#ff8f1c'
+          : p.druh === 'dvojce' ? '#ff5d95' : p.doObracene ? '#a86bff' : '#3fb8ff';
+  const B = p.druh === 'zmenseni' ? '#b6f5cd' : p.druh === 'rychlost' ? '#ffd7a0'
+          : p.druh === 'dvojce' ? '#ffc2d8' : p.doObracene ? '#e0b3ff' : '#b3ecff';
+  const zar = p.druh === 'zmenseni' ? 'rgba(63,208,122,.4)' : p.druh === 'rychlost' ? 'rgba(255,143,28,.4)'
+          : p.druh === 'dvojce' ? 'rgba(255,93,149,.4)' : p.doObracene ? 'rgba(168,107,255,.4)' : 'rgba(63,184,255,.4)';
+  const f = hodiny * 4 + p.faze;
+
+  // světelný sloup
+  const g = ctx.createLinearGradient(p.x - 26, 0, p.x + 26, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(.5, zar);
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(p.x - 30, STROP, 60, ZEM - STROP);
+
+  // sloupky nahoře a dole
+  for (const y of [STROP + 16, ZEM - 16]){
+    ctx.fillStyle = A;
+    ctx.beginPath(); ctx.roundRect(p.x - 20, y - 14, 40, 28, 8); ctx.fill();
+    ctx.fillStyle = B;
+    ctx.beginPath(); ctx.roundRect(p.x - 13, y - 8, 26, 16, 5); ctx.fill();
+  }
+
+  // kroužky, které putují nahoru nebo dolů
+  ctx.lineWidth = 4;
+  for (let i = 0; i < 6; i++){
+    let t = (i / 6 + (f * .12) % 1) % 1;
+    if (dolu) t = 1 - t;
+    const y = STROP + 30 + t * (ZEM - STROP - 60);
+    const w = 16 + Math.sin(t * Math.PI) * 12;
+    ctx.strokeStyle = A;
+    ctx.globalAlpha = .35 + Math.sin(t * Math.PI) * .55;
+    ctx.beginPath(); ctx.ellipse(p.x, y, w, 7, 0, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // značky uprostřed podle druhu portálu
+  ctx.fillStyle = B;
+  if (gravP){
+    for (let i = 0; i < 3; i++){
+      const y = 130 + i * 130 + Math.sin(f + i) * 6;
+      ctx.beginPath();
+      if (dolu){ ctx.moveTo(p.x, y + 16); ctx.lineTo(p.x - 13, y - 6); ctx.lineTo(p.x + 13, y - 6); }
+      else     { ctx.moveTo(p.x, y - 16); ctx.lineTo(p.x - 13, y + 6); ctx.lineTo(p.x + 13, y + 6); }
+      ctx.closePath(); ctx.fill();
+    }
+  } else if (p.druh === 'zmenseni'){
+    ctx.strokeStyle = B; ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++){
+      const y = 130 + i * 130;
+      for (let q = 0; q < 3; q++){
+        const r2 = 26 - ((f * 14 + q * 9) % 26);
+        ctx.globalAlpha = r2 / 26;
+        ctx.beginPath(); ctx.arc(p.x, y, r2 + 3, 0, 7); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  } else if (p.druh === 'dvojce'){
+    for (let i = 0; i < 3; i++){
+      const y = 130 + i * 130;
+      for (const d of [-13, 13]){
+        ctx.beginPath(); ctx.arc(p.x, y + d + Math.sin(f + i) * 3, 8, 0, 7); ctx.fill();
+      }
+    }
+  } else {
+    for (let i = 0; i < 3; i++){
+      const y = 130 + i * 130;
+      for (let q = 0; q < 2; q++){
+        const x0 = p.x - 16 + q * 15 + Math.sin(f * 1.5 + q) * 3;
+        ctx.beginPath();
+        ctx.moveTo(x0, y - 14); ctx.lineTo(x0 + 12, y); ctx.lineTo(x0, y + 14);
+        ctx.lineTo(x0 + 5, y); ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  napis(p.druh === 'zmenseni' ? 'ZMENŠENÍ' : p.druh === 'rychlost' ? 'ZRYCHLENÍ'
+        : p.druh === 'dvojce' ? 'DVĚ SLEPICE'
+        : p.doObracene ? 'VZHŮRU NOHAMA' : 'ZPÁTKY DOLŮ',
+        p.x, 66, B, 'bold 16px system-ui', 5);
+}
+
+function kresliStrasak(p){
+  const vrsek = ZEM - p.v;
+  const mav = Math.sin(hodiny * 4 + p.faze);
+  ctx.save(); ctx.translate(p.x, vrsek);
+  ctx.lineCap = 'round';
+  // kůl
+  ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 9;
+  ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, p.v); ctx.stroke();
+  ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(-34, 46); ctx.lineTo(20, 46); ctx.stroke();
+  // sláma z levého rukávu
+  ctx.strokeStyle = '#e8c24a'; ctx.lineWidth = 3;
+  for (let i = 0; i < 4; i++){
+    ctx.beginPath(); ctx.moveTo(-32, 46); ctx.lineTo(-46 - i*2, 38 + i*6); ctx.stroke();
+  }
+  // košile
+  ctx.fillStyle = '#4a8fd4';
+  ctx.beginPath(); ctx.roundRect(-24, 36, 48, 56, 9); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.32)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 4; i++){ ctx.beginPath(); ctx.moveTo(-24, 46 + i*14); ctx.lineTo(24, 46 + i*14); ctx.stroke(); }
+  for (let i = 0; i < 3; i++){ ctx.beginPath(); ctx.moveTo(-16 + i*16, 36); ctx.lineTo(-16 + i*16, 92); ctx.stroke(); }
+  ctx.fillStyle = '#e8c24a';
+  ctx.beginPath(); ctx.moveTo(-16, 92); ctx.lineTo(-10, 106); ctx.lineTo(-4, 92); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(6, 92); ctx.lineTo(12, 104); ctx.lineTo(18, 92); ctx.closePath(); ctx.fill();
+  // mávající ruka
+  ctx.save(); ctx.translate(20, 46); ctx.rotate(-.55 + mav * .55);
+  ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(28, -6); ctx.stroke();
+  ctx.strokeStyle = '#e8c24a'; ctx.lineWidth = 3;
+  for (let i = 0; i < 4; i++){
+    ctx.beginPath(); ctx.moveTo(28, -6); ctx.lineTo(40 + i*2, -16 + i*7); ctx.stroke();
+  }
+  ctx.restore();
+  // hlava z pytle
+  ctx.fillStyle = '#e6cf9b';
+  ctx.beginPath(); ctx.ellipse(0, 10, 21, 24, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#b89a5e'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#3a2a20';
+  ctx.beginPath(); ctx.arc(-7, 5, 3.2, 0, 7); ctx.arc(7, 5, 3.2, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#3a2a20'; ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.arc(0, 12, 8, .3, Math.PI - .3); ctx.stroke();
+  // klobouk
+  ctx.fillStyle = '#c98f3a';
+  ctx.beginPath(); ctx.ellipse(0, -9, 31, 8, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-15, -9); ctx.quadraticCurveTo(0, -42, 15, -9); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8f6410'; ctx.fillRect(-15, -14, 30, 5);
+  ctx.lineCap = 'butt';
+  ctx.restore();
+  if (mav > .92) napis('AHOJ!', p.x + 62, vrsek - 26, '#ffffff', 'bold 18px system-ui', 5);
+}
+
+function kresliSteblo(p){
+  const oh = Math.sin(hodiny * 1.6 + p.faze) * .07;
+  ctx.save(); ctx.translate(p.x, ZEM + 4); ctx.rotate(oh);
+  ctx.strokeStyle = '#3f8a3a'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -p.v); ctx.stroke();
+  ctx.fillStyle = '#4caf50';
+  for (let i = 0; i < 3; i++){
+    const y = -18 - i * (p.v / 4);
+    const s = i % 2 ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.quadraticCurveTo(s * 26, y - 14, s * 40, y + 4);
+    ctx.quadraticCurveTo(s * 24, y - 2, 0, y + 6);
+    ctx.closePath(); ctx.fill();
+  }
+  // klas nahoře
+  const g = ctx.createLinearGradient(-6, 0, 6, 0);
+  g.addColorStop(0, '#e8a531'); g.addColorStop(.4, '#ffd85e'); g.addColorStop(1, '#d98f22');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(6, -p.v + 12, 7, 15, .25, 0, 7); ctx.fill();
+  ctx.fillStyle = '#7cc35f';
+  ctx.beginPath(); ctx.ellipse(0, -p.v - 4, 4, 14, .1, 0, 7); ctx.fill();
+  ctx.lineCap = 'butt';
+  ctx.restore();
+}
+
+function kresliZrno(p){
+  const y = p.y + Math.sin(p.faze) * 5;
+  ctx.save(); ctx.translate(p.x, y); ctx.rotate(-.35);
+  // listy
+  ctx.fillStyle = '#4caf50';
+  ctx.beginPath(); ctx.ellipse(-9, 12, 6, 15, .5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(9, 12, 6, 15, -.5, 0, 7); ctx.fill();
+  // klas
+  const g = ctx.createLinearGradient(-10, 0, 10, 0);
+  g.addColorStop(0, '#e8a531'); g.addColorStop(.4, '#ffd85e'); g.addColorStop(1, '#d98f22');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, -2, 11, 19, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#b8781c'; ctx.lineWidth = 1.6; ctx.stroke();
+  // zrníčka
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  for (let r = -3; r <= 3; r++)
+    for (let c = -1; c <= 1; c++){
+      const px = c*6 + (r%2 ? 3 : 0), py = r*5 - 2;
+      if (Math.hypot(px/11, py/19) > .85) continue;
+      ctx.beginPath(); ctx.arc(px, py, 1.9, 0, 7); ctx.fill();
+    }
+  ctx.restore();
+}
+
+function kresliPirko(p){
+  const y = p.y + Math.sin(p.faze) * 7;
+  if (p.druh && p.druh !== 'pirko'){
+    const barva = p.druh === 'stit' ? ['#74d4ff','#d6f2ff'] : p.druh === 'magnet' ? ['#ff5d5d','#ffd7d7']
+                : ['#4fd8e8','#d3fbff'];
+    const zg = ctx.createRadialGradient(p.x, y, 3, p.x, y, 40);
+    zg.addColorStop(0, 'rgba(255,255,255,.7)');
+    zg.addColorStop(.5, p.druh === 'stit' ? 'rgba(116,212,255,.35)'
+                    : p.druh === 'magnet' ? 'rgba(255,93,93,.35)' : 'rgba(79,216,232,.35)');
+    zg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(p.x, y, 40, 0, 7); ctx.fill();
+    ctx.save(); ctx.translate(p.x, y);
+    if (p.druh === 'stit'){                       // bublina se štítem
+      ctx.strokeStyle = barva[0]; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(0, 0, 17, 0, 7); ctx.stroke();
+      ctx.fillStyle = 'rgba(214,242,255,.45)';
+      ctx.beginPath(); ctx.arc(0, 0, 15, 0, 7); ctx.fill();
+      ctx.fillStyle = barva[1];
+      ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(9, -6); ctx.lineTo(9, 4);
+      ctx.quadraticCurveTo(0, 13, -9, 4); ctx.lineTo(-9, -6); ctx.closePath(); ctx.fill();
+    } else if (p.druh === 'magnet'){              // magnet
+      ctx.rotate(Math.sin(p.faze * .6) * .25);
+      ctx.strokeStyle = barva[0]; ctx.lineWidth = 8; ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.arc(0, 2, 12, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-12, 2); ctx.lineTo(-12, 12); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(12, 2); ctx.lineTo(12, 12); ctx.stroke();
+      ctx.strokeStyle = '#f2f6ff'; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(-12, 12); ctx.lineTo(-12, 18); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(12, 12); ctx.lineTo(12, 18); ctx.stroke();
+    } else {                                      // přesýpací hodiny
+      ctx.fillStyle = barva[1];
+      ctx.fillRect(-12, -16, 24, 4); ctx.fillRect(-12, 12, 24, 4);
+      ctx.fillStyle = barva[0];
+      ctx.beginPath(); ctx.moveTo(-10, -12); ctx.lineTo(10, -12); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-10, 12); ctx.lineTo(10, 12); ctx.lineTo(0, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(0, 4 + Math.sin(p.faze) * 2, 2.4, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+    for (let i = 0; i < 3; i++){
+      const a = p.faze * 1.5 + i * 2.1, r2 = 28 + Math.sin(p.faze * 2 + i) * 5;
+      ctx.fillStyle = 'rgba(255,255,255,.9)';
+      ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*r2, y + Math.sin(a)*r2, 2.3, 0, 7); ctx.fill();
+    }
+    return;
+  }
+  // záře
+  const g = ctx.createRadialGradient(p.x, y, 4, p.x, y, 40);
+  g.addColorStop(0, 'rgba(255,255,255,.75)'); g.addColorStop(.5, 'rgba(255,214,120,.35)');
+  g.addColorStop(1, 'rgba(255,214,120,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, 40, 0, 7); ctx.fill();
+
+  ctx.save(); ctx.translate(p.x, y); ctx.rotate(Math.sin(p.faze*.6) * .35 - .5);
+  // prapor pírka — duhový
+  const d = ctx.createLinearGradient(0, -22, 0, 22);
+  d.addColorStop(0, '#ff8fb1'); d.addColorStop(.3, '#ffd166');
+  d.addColorStop(.6, '#8ce99a'); d.addColorStop(1, '#74c0fc');
+  ctx.fillStyle = d;
+  ctx.beginPath();
+  ctx.moveTo(0, -24);
+  ctx.bezierCurveTo(13, -12, 13, 12, 0, 24);
+  ctx.bezierCurveTo(-13, 12, -13, -12, 0, -24);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.6; ctx.stroke();
+  // osa a chmýří
+  ctx.strokeStyle = '#fffaf0'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(0, 30); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+  for (let i = -18; i < 20; i += 6){
+    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(-8, i - 5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(8, i - 5); ctx.stroke();
+  }
+  ctx.restore();
+
+  // jiskřičky
+  for (let i = 0; i < 3; i++){
+    const a = p.faze * 1.6 + i * 2.1, r = 30 + Math.sin(p.faze*2 + i) * 6;
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*r, y + Math.sin(a)*r, 2.4, 0, 7); ctx.fill();
+  }
+}
+
+function kresliVejce(p){
+  if (p.ohnive){
+    const z = ctx.createRadialGradient(p.x, p.y, 3, p.x, p.y, 34);
+    z.addColorStop(0, 'rgba(255,190,90,.8)'); z.addColorStop(1, 'rgba(255,60,20,0)');
+    ctx.fillStyle = z; ctx.beginPath(); ctx.arc(p.x, p.y, 34, 0, 7); ctx.fill();
+    if (Math.random() < .5)
+      castice.push({x: p.x, y: p.y, vx: nah(-40, 60), vy: nah(-50, 10), zivot: nah(.2, .5), max: .5,
+                    barva: nahZ(['#ff7a2f','#ffd166']), vel: nah(3, 6)});
+  }
+  if (p.zlate){
+    const z = ctx.createRadialGradient(p.x, p.y, 3, p.x, p.y, 42);
+    z.addColorStop(0, 'rgba(255,240,180,.75)'); z.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.fillStyle = z; ctx.beginPath(); ctx.arc(p.x, p.y, 42, 0, 7); ctx.fill();
+    for (let i = 0; i < 3; i++){
+      const a = p.uhel*1.4 + i*2.1, rr = 26 + Math.sin(p.uhel*3 + i)*5;
+      ctx.fillStyle = 'rgba(255,255,220,.95)';
+      ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*rr, p.y + Math.sin(a)*rr, 2.6, 0, 7); ctx.fill();
+    }
+  }
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.uhel);
+  const g = ctx.createLinearGradient(-10, -14, 10, 14);
+  if (p.zlate){ g.addColorStop(0, '#fff6d0'); g.addColorStop(.5, '#ffd166'); g.addColorStop(1, '#d99a1c'); }
+  else if (p.ohnive){ g.addColorStop(0, '#fff0c0'); g.addColorStop(.5, '#ff8c3a'); g.addColorStop(1, '#b52210'); }
+  else { g.addColorStop(0, '#ffffff'); g.addColorStop(.6, '#fdf0d5'); g.addColorStop(1, '#e8d2a8'); }
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 0, p.zlate ? 13 : 11, p.zlate ? 16 : 14, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = p.zlate ? '#a87613' : p.ohnive ? '#7a1408' : '#c8ab7d'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = p.zlate ? 'rgba(255,255,255,.35)' : 'rgba(180,150,110,.5)';
+  ctx.beginPath(); ctx.arc(3, 4, 2, 0, 7); ctx.arc(-4, 1, 1.5, 0, 7); ctx.arc(1, -6, 1.6, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  ctx.beginPath(); ctx.ellipse(-4, -6, 3, 4.5, -.4, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+// ============ BOSS: liška v letadle ============
+function srdcaBosse(b, vys){
+  for (let i = 0; i < b.zivoty; i++)
+    srdce(b.x - (b.zivoty - 1) * 15 + i * 30, b.y - vys, 11, '#ff5d73');
+}
+
+// --- pomůcky, aby bossové kreslili stejným štětcem jako slepice ---
+function obtah(barva, sirka = 2.4){ ctx.strokeStyle = barva; ctx.lineWidth = sirka; ctx.stroke(); }
+function oko(x, y, rr, obrysB = '#2a1f16', pohled = 0, zorn = '#241c14'){
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(x, y, rr, 0, 7); ctx.fill();
+  obtah(obrysB, Math.max(1.4, rr * .3));
+  ctx.fillStyle = zorn;
+  ctx.beginPath(); ctx.arc(x + pohled, y, rr * .5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(x + pohled - rr * .22, y - rr * .26, rr * .21, 0, 7); ctx.fill();
+}
+function koncetina(x1, y1, cx, cy, x2, y2, w, barva, obrysB){
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.quadraticCurveTo(cx, cy, x2, y2);
+  ctx.strokeStyle = obrysB; ctx.lineWidth = w + 3.4; ctx.stroke();
+  ctx.strokeStyle = barva;  ctx.lineWidth = w;       ctx.stroke();
+}
+
+// ---------- VLK S BUBNEM ----------
+function kresliVlk(bs){
+  if (bs.blik > 0 && Math.floor(bs.blik * 16) % 2 === 0) return;
+  const O = '#2b3244';
+  stinPod(bs.x - 6, ZEM + 4, 66, .26);
+  const posk = Math.abs(Math.sin(bs.krok)) * 5;
+  ctx.save();
+  ctx.translate(bs.x, bs.y - posk);
+  ctx.scale(1.3, 1.3);
+  ctx.lineJoin = 'round';
+
+  // --- ocas ---
+  koncetina(30, -4, 74 + Math.sin(bs.faze*2)*10, -14, 60, -44, 15, '#7d8a99', O);
+  ctx.fillStyle = '#f3ece0';
+  ctx.beginPath(); ctx.arc(60, -44, 10, 0, 7); ctx.fill(); obtah(O, 2.2);
+
+  // --- nohy (dobře vidět pod tělem) ---
+  for (const [i, o] of [[0, -6], [1, 20]]){
+    const f = Math.sin(bs.krok + i * 3.14) * 7;
+    koncetina(o, 16, o + f*.5, 30, o + f, 44, 12, '#5c6b7d', O);
+    ctx.fillStyle = '#4a5768';
+    ctx.beginPath(); ctx.ellipse(o + f - 3, 46, 13, 6.5, 0, 0, 7); ctx.fill(); obtah(O, 2.2);
+  }
+
+  // --- tělo ---
+  const gt = ctx.createLinearGradient(0, -38, 0, 26);
+  gt.addColorStop(0, '#a3b4c6'); gt.addColorStop(.55, '#7d8a99'); gt.addColorStop(1, '#546172');
+  ctx.fillStyle = gt;
+  ctx.beginPath(); ctx.ellipse(8, -6, 36, 29, .06, 0, 7); ctx.fill(); obtah(O, 3);
+  ctx.fillStyle = '#f3ece0';
+  ctx.beginPath(); ctx.ellipse(-4, 4, 18, 19, -.15, 0, 7); ctx.fill();
+  ctx.globalAlpha = .45; obtah(O, 1.8); ctx.globalAlpha = 1;
+
+  // --- BUBEN před ním ---
+  ctx.save();
+  ctx.translate(-46, 8);
+  const zv = 1 + bs.buch * .12;
+  ctx.scale(zv, zv);
+  const gb = ctx.createLinearGradient(-33, 0, 33, 0);
+  gb.addColorStop(0, '#7a3226'); gb.addColorStop(.4, '#c05a41');
+  gb.addColorStop(.68, '#9c4130'); gb.addColorStop(1, '#68281e');
+  ctx.fillStyle = gb;
+  ctx.beginPath(); ctx.roundRect(-33, -22, 66, 46, 8); ctx.fill(); obtah(O, 3);
+  ctx.fillStyle = '#f0e2c2';
+  ctx.beginPath(); ctx.ellipse(0, -22, 33, 12, 0, 0, 7); ctx.fill(); obtah(O, 2.6);
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.beginPath(); ctx.ellipse(-12, -25, 11, 3.8, -.2, 0, 7); ctx.fill();
+  for (const yy of [-6, 12]){
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath(); ctx.roundRect(-34, yy - 3.5, 68, 7, 3.5); ctx.fill(); obtah('#a87613', 1.8);
+  }
+  ctx.fillStyle = '#ffd166';                       // vlnovka na bubnu
+  ctx.beginPath(); ctx.arc(0, 3, 9, 0, 7); ctx.fill(); obtah('#a87613', 1.8);
+  if (bs.buch > 0){
+    ctx.lineCap = 'round';
+    for (const [j, rr] of [36, 54, 72].entries()){
+      ctx.strokeStyle = 'rgba(201,160,255,' + (bs.buch * (1 - j*.22)) + ')';
+      ctx.lineWidth = 5 - j;
+      ctx.beginPath(); ctx.arc(0, -22, rr * (1.1 - bs.buch * .3), -2.5, -.7); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // --- HLAVA ---
+  ctx.save();
+  ctx.translate(-18, -58);
+  ctx.rotate(-bs.buch * .14);
+  for (const sg of [-1, 1]){                       // uši
+    ctx.fillStyle = '#7d8a99';
+    ctx.beginPath();
+    ctx.moveTo(sg*5, -14); ctx.lineTo(sg*16, -48); ctx.lineTo(sg*27, -10);
+    ctx.closePath(); ctx.fill(); obtah(O, 2.6);
+    ctx.fillStyle = '#e79aa8';
+    ctx.beginPath();
+    ctx.moveTo(sg*11, -16); ctx.lineTo(sg*17, -38); ctx.lineTo(sg*22, -14);
+    ctx.closePath(); ctx.fill();
+  }
+  const gh = ctx.createLinearGradient(0, -24, 0, 24);
+  gh.addColorStop(0, '#adbdcd'); gh.addColorStop(.6, '#8b98a8'); gh.addColorStop(1, '#66738a');
+  ctx.fillStyle = gh;
+  ctx.beginPath(); ctx.ellipse(0, 0, 28, 25, 0, 0, 7); ctx.fill(); obtah(O, 3);
+  ctx.fillStyle = '#f3ece0';                       // čenich
+  ctx.beginPath(); ctx.ellipse(-21, 8, 17, 12, -.12, 0, 7); ctx.fill(); obtah(O, 2.4);
+  ctx.fillStyle = '#2b3244';
+  ctx.beginPath(); ctx.ellipse(-34, 4, 6.5, 5, -.3, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.beginPath(); ctx.arc(-36, 2.5, 1.8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff';                       // zub
+  ctx.beginPath(); ctx.moveTo(-25, 14); ctx.lineTo(-21, 23); ctx.lineTo(-17, 14);
+  ctx.closePath(); ctx.fill(); obtah(O, 1.6);
+  oko(-8, -5, 6.8, O, -1.5, '#3d2a12');
+  oko(12, -7, 5.8, O, -1.3, '#3d2a12');
+  ctx.strokeStyle = O; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-17, -16); ctx.lineTo(-3, -12); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(20, -18); ctx.lineTo(7, -13); ctx.stroke();
+  ctx.restore();
+
+  // --- paže s paličkami (kreslí se nad hlavou i bubnem, ať jsou vidět) ---
+  for (const sg of [-1, 1]){
+    const hx = -58 + (sg > 0 ? 18 : 0);
+    const hy = -32 - bs.buch * 24 + (sg > 0 ? 4 : 0);
+    koncetina(0, -18, -26, -20, hx, hy, 11, '#8b98a8', O);
+    ctx.fillStyle = '#9fadbd';
+    ctx.beginPath(); ctx.arc(hx, hy, 8.5, 0, 7); ctx.fill(); obtah(O, 2.2);
+    // palička dopadá na blánu bubnu
+    const tx = hx + 16, ty = hy + 22 + bs.buch * 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty);
+    ctx.strokeStyle = O; ctx.lineWidth = 9.5; ctx.stroke();
+    ctx.strokeStyle = '#e8d5a8'; ctx.lineWidth = 5.5; ctx.stroke();
+    ctx.fillStyle = '#f7ecd2';
+    ctx.beginPath(); ctx.arc(tx, ty, 7, 0, 7); ctx.fill(); obtah(O, 2.2);
+  }
+
+  ctx.restore();
+  srdcaBosse(bs, 132);
+}
+
+// ---------- PAVOUČÍ KRÁLOVNA ----------
+function kresliPavouk(b){
+  if (b.blik > 0 && Math.floor(b.blik * 16) % 2 === 0) return;
+  const O = '#25102f';
+
+  // vlákna, která se dají přestřihnout
+  for (let k = 0; k < b.zivoty; k++){
+    const vx = b.x - 62 + k * 62;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = turbo > 0 ? 'rgba(160,255,201,.9)' : 'rgba(236,247,255,.6)';
+    ctx.lineWidth = turbo > 0 ? 4.5 : 2.6;
+    ctx.beginPath();
+    ctx.moveTo(vx, b.y + 22);
+    for (let yy = b.y + 22; yy < 352; yy += 22)
+      ctx.lineTo(vx + Math.sin(yy * .05 + b.faze) * 5, yy);
+    ctx.stroke();
+    ctx.fillStyle = turbo > 0 ? '#a0ffc9' : '#e6f5ff';       // korálek, ať vlákno nekončí v prázdnu
+    ctx.beginPath(); ctx.arc(vx, 352, turbo > 0 ? 6.5 : 4.5, 0, 7); ctx.fill();
+    obtah(turbo > 0 ? '#2b6b4a' : '#9fb3c2', 1.8);
+  }
+  // nit ke stropu
+  ctx.strokeStyle = 'rgba(236,247,255,.65)'; ctx.lineWidth = 3.2;
+  ctx.beginPath(); ctx.moveTo(b.x, STROP); ctx.lineTo(b.x, b.y - 22); ctx.stroke();
+
+  // jemná záře, ať nesplyne s noční oblohou
+  const zg = ctx.createRadialGradient(b.x, b.y, 20, b.x, b.y, 88);
+  zg.addColorStop(0, 'rgba(160,90,220,.28)'); zg.addColorStop(1, 'rgba(160,90,220,0)');
+  ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(b.x, b.y, 88, 0, 7); ctx.fill();
+
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.lineJoin = 'round';
+
+  // --- osm nohou ---
+  for (let i = 0; i < 4; i++){
+    for (const sg of [-1, 1]){
+      const sw = Math.sin(b.faze * 2 + i * .8) * .1;
+      // koleno vysoko nad tělem, chodidlo daleko dole = klenutá pavoučí noha
+      const kx = sg * (46 + i * 12), ky = -54 - i * 5 + sw * 46;
+      const ex = sg * (80 + i * 16), ey = 8 + i * 19 + sw * 34;
+      koncetina(sg * 12, -6, kx, ky, kx + sg * 8, (ky + ey) / 2, 8 - i * .8, '#6a3a94', O);
+      koncetina(kx + sg * 8, (ky + ey) / 2, sg * (62 + i * 12), ey - 12, ex, ey, 6 - i * .7, '#59307f', O);
+      ctx.fillStyle = '#3d1d5c';
+      ctx.beginPath(); ctx.arc(ex, ey, 4.4, 0, 7); ctx.fill(); obtah(O, 1.6);
+    }
+  }
+
+  // --- zadeček ---
+  const gz = ctx.createRadialGradient(-8, -6, 8, 0, 8, 46);
+  gz.addColorStop(0, '#9b62d6'); gz.addColorStop(.55, '#6a34a0'); gz.addColorStop(1, '#3a1359');
+  ctx.fillStyle = gz;
+  ctx.beginPath(); ctx.ellipse(0, 8, 40, 34, 0, 0, 7); ctx.fill(); obtah(O, 3.2);
+  // lesk
+  ctx.fillStyle = 'rgba(255,255,255,.3)';
+  ctx.beginPath(); ctx.ellipse(-14, -6, 12, 7, -.5, 0, 7); ctx.fill();
+  // znak přesýpacích hodin
+  ctx.fillStyle = '#ff5d73';
+  ctx.beginPath();
+  ctx.moveTo(-11, 0); ctx.lineTo(11, 0); ctx.lineTo(0, 13);
+  ctx.lineTo(11, 28); ctx.lineTo(-11, 28); ctx.lineTo(0, 13); ctx.closePath(); ctx.fill();
+  obtah('#8c2436', 2);
+
+  // --- hlava ---
+  const gh = ctx.createLinearGradient(0, -42, 0, -12);
+  gh.addColorStop(0, '#7f4bb0'); gh.addColorStop(1, '#4a2470');
+  ctx.fillStyle = gh;
+  ctx.beginPath(); ctx.ellipse(0, -26, 25, 19, 0, 0, 7); ctx.fill(); obtah(O, 3);
+
+  // --- korunka ---
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath();
+  ctx.moveTo(-19, -40); ctx.lineTo(-13, -57); ctx.lineTo(-5, -43);
+  ctx.lineTo(3, -60); ctx.lineTo(11, -43); ctx.lineTo(18, -56); ctx.lineTo(21, -38);
+  ctx.closePath(); ctx.fill(); obtah('#a87613', 2.4);
+  ctx.fillStyle = '#ff5d73';
+  ctx.beginPath(); ctx.arc(3, -46, 4, 0, 7); ctx.fill(); obtah('#8c2436', 1.6);
+
+  // --- osm očí ---
+  oko(-12, -30, 6.2, O, -1.2, '#2b0f3a');
+  oko(13, -30, 6.2, O, -1.2, '#2b0f3a');
+  ctx.fillStyle = '#ffe066';
+  for (const [ox, oy, rr] of [[-4,-35,3.2],[5,-35,3.2],[-8,-20,2.8],[-1,-18,2.4],[6,-19,2.6]]){
+    ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill(); obtah(O, 1.4);
+    ctx.fillStyle = '#2b0f3a';
+    ctx.beginPath(); ctx.arc(ox, oy, rr * .45, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffe066';
+  }
+  // kusadla
+  for (const sg of [-1, 1]){
+    ctx.fillStyle = '#f0e2c2';
+    ctx.beginPath();
+    ctx.moveTo(sg*7, -14); ctx.quadraticCurveTo(sg*13, -6, sg*10, 1);
+    ctx.quadraticCurveTo(sg*5, -6, sg*4, -13); ctx.closePath(); ctx.fill();
+    obtah(O, 1.8);
+  }
+  ctx.restore();
+  srdcaBosse(b, 88);
+}
+
+// ---------- KOHOUT-DRAK (obří brácha slepice) ----------
+function kresliKohout(b){
+  if (b.blik > 0 && Math.floor(b.blik * 16) % 2 === 0) return;
+  const O = '#6b4b2a';                                    // stejný teplý obrys jako u slepice
+  stinPod(b.x, ZEM + 4, 66, .26);
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(Math.sin(b.faze) * .03);
+  ctx.lineJoin = 'round';
+
+  // --- ocasní pera (jako u slepice, ale velká a dračí) ---
+  for (const [i, c] of ['#2f8a52','#3f9a5c','#57b86f','#8bd48f'].entries()){
+    ctx.save(); ctx.rotate(-.42 - i * .2 + Math.sin(b.faze + i) * .04);
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.ellipse(52 + i * 7, -8, 48 - i * 4, 12, 0, 0, 7); ctx.fill();
+    obtah('#1f6b3c', 2.6);
+    ctx.restore();
+  }
+
+  // --- nohy ---
+  for (const o of [-16, 16]){
+    koncetina(o, 40, o, 68, o, 94, 10, '#f0a028', O);
+    for (const t of [-14, 0, 13]){
+      ctx.beginPath(); ctx.moveTo(o, 94); ctx.lineTo(o + t, 100);
+      ctx.strokeStyle = O; ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.strokeStyle = '#f0a028'; ctx.lineWidth = 4.4; ctx.stroke();
+    }
+  }
+
+  // --- tělo ---
+  const gt = ctx.createLinearGradient(0, -48, 0, 48);
+  gt.addColorStop(0, '#fdfdfd'); gt.addColorStop(.55, '#e4e4e4'); gt.addColorStop(1, '#b0aaa0');
+  ctx.fillStyle = gt;
+  ctx.beginPath(); ctx.ellipse(0, 4, 52, 49, 0, 0, 7); ctx.fill(); obtah(O, 3.4);
+  // šupiny na hrudi
+  ctx.strokeStyle = 'rgba(107,75,42,.35)'; ctx.lineWidth = 2;
+  for (let ry = -16; ry < 40; ry += 13)
+    for (let rx = -34; rx < 22; rx += 17){
+      ctx.beginPath(); ctx.arc(rx + (ry % 26 ? 8 : 0), ry, 7, 3.6, 5.9); ctx.stroke();
+    }
+
+  // --- dračí křídlo ---
+  ctx.fillStyle = '#3f9a5c';
+  ctx.beginPath();
+  ctx.moveTo(10, -20);
+  ctx.quadraticCurveTo(58, -22, 62, -2);          // horní hrana křídla
+  ctx.quadraticCurveTo(56, 4, 52, 0);             // zubatá zadní hrana
+  ctx.quadraticCurveTo(52, 12, 46, 10);
+  ctx.quadraticCurveTo(44, 22, 38, 20);
+  ctx.quadraticCurveTo(34, 30, 26, 26);
+  ctx.quadraticCurveTo(14, 8, 10, -20);
+  ctx.fill(); obtah('#1f6b3c', 3);
+  ctx.strokeStyle = 'rgba(31,107,60,.75)'; ctx.lineWidth = 2.4;
+  for (const [ax, ay] of [[52,-1],[46,10],[38,19],[27,25]]){
+    ctx.beginPath(); ctx.moveTo(14, -16); ctx.lineTo(ax, ay); ctx.stroke();
+  }
+  // dračí hřebeny na hřbetě
+  ctx.fillStyle = '#2f8a52';
+  for (const [hx2, hy2, hs] of [[-2,-46,10],[-16,-40,8],[-28,-30,6]]){
+    ctx.beginPath();
+    ctx.moveTo(hx2 - hs, hy2 + hs); ctx.lineTo(hx2, hy2 - hs); ctx.lineTo(hx2 + hs, hy2 + hs);
+    ctx.closePath(); ctx.fill(); obtah('#1f6b3c', 2);
+  }
+
+  // --- hlava ---
+  ctx.save();
+  ctx.translate(-30, -56);
+  ctx.rotate(b.chrl * .26);
+  // hřebínek
+  ctx.fillStyle = '#e63946';
+  ctx.beginPath();
+  ctx.moveTo(14, -18);
+  ctx.quadraticCurveTo(8, -40, 0, -22);
+  ctx.quadraticCurveTo(-8, -46, -14, -24);
+  ctx.quadraticCurveTo(-22, -42, -26, -18);
+  ctx.closePath(); ctx.fill(); obtah('#a8232e', 2.6);
+  // dračí rohy — velké a tmavé, aby je bylo proti bílé hlavě i nebi vidět
+  for (const [hx, sc] of [[6, 1], [20, .8]]){
+    const g = ctx.createLinearGradient(hx, -10, hx + 30*sc, -66*sc);
+    g.addColorStop(0, '#8a6f45'); g.addColorStop(.6, '#c9ad78'); g.addColorStop(1, '#efe0bc');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(hx - 8, -14);
+    ctx.quadraticCurveTo(hx + 40*sc, -30*sc, hx + 32*sc, -68*sc);
+    ctx.quadraticCurveTo(hx + 16*sc, -40*sc, hx + 10, -6);
+    ctx.closePath(); ctx.fill(); obtah('#5c4526', 3);
+    ctx.strokeStyle = 'rgba(92,69,38,.6)'; ctx.lineWidth = 2;
+    for (const t of [.3, .5, .7]){
+      const px1 = hx - 8 + (hx + 32*sc - hx + 8) * t, py1 = -14 + (-68*sc + 14) * t;
+      const px2 = hx + 10 + (hx + 16*sc - hx - 10) * t, py2 = -6 + (-40*sc + 6) * t;
+      ctx.beginPath(); ctx.moveTo(px1, py1); ctx.lineTo(px2, py2); ctx.stroke();
+    }
+  }
+  // lebka
+  const gh = ctx.createLinearGradient(0, -26, 0, 24);
+  gh.addColorStop(0, '#ffffff'); gh.addColorStop(1, '#ddd7cd');
+  ctx.fillStyle = gh;
+  ctx.beginPath(); ctx.ellipse(0, 0, 28, 25, 0, 0, 7); ctx.fill(); obtah(O, 3.2);
+  // zobák
+  ctx.fillStyle = '#ffa726';
+  ctx.beginPath(); ctx.moveTo(-22, -8); ctx.lineTo(-58, 2 + b.chrl * 5); ctx.lineTo(-22, 8);
+  ctx.closePath(); ctx.fill(); obtah(O, 2.6);
+  ctx.fillStyle = '#e08a12';
+  ctx.beginPath(); ctx.moveTo(-22, 8); ctx.lineTo(-54, 12 + b.chrl * 12); ctx.lineTo(-22, 20);
+  ctx.closePath(); ctx.fill(); obtah(O, 2.6);
+  // lalok
+  ctx.fillStyle = '#e63946';
+  ctx.beginPath(); ctx.ellipse(-14, 24, 9, 13, 0, 0, 7); ctx.fill(); obtah('#a8232e', 2.2);
+  // oko
+  oko(-6, -6, 8, O, -1.8, b.stav === 'zasazena' ? '#c9302c' : '#241c14');
+  // zamračené obočí, ať je vidět, že je to boss
+  ctx.strokeStyle = O; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-16, -18); ctx.lineTo(2, -13); ctx.stroke();
+  // oheň v zobáku
+  if (b.chrl > .15){
+    const zg = ctx.createRadialGradient(-58, 8, 2, -58, 8, 30 * b.chrl);
+    zg.addColorStop(0, 'rgba(255,246,208,' + b.chrl + ')');
+    zg.addColorStop(.45, 'rgba(255,140,58,' + (b.chrl * .85) + ')');
+    zg.addColorStop(1, 'rgba(230,57,70,0)');
+    ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(-58, 8, 30 * b.chrl, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  ctx.restore();
+  srdcaBosse(b, 152);
+}
+
+function kresliKouli(p){
+  const pu = 1 + Math.sin(p.faze * 6) * .05;
+  ctx.save(); ctx.translate(p.x, p.y); ctx.scale(pu, pu);
+  // ohon
+  const tg = ctx.createLinearGradient(0, 0, 110, 0);
+  tg.addColorStop(0, 'rgba(255,140,60,.55)'); tg.addColorStop(1, 'rgba(255,60,20,0)');
+  ctx.fillStyle = tg;
+  ctx.beginPath(); ctx.moveTo(0, -26); ctx.quadraticCurveTo(80, -8, 118, 0);
+  ctx.quadraticCurveTo(80, 8, 0, 26); ctx.closePath(); ctx.fill();
+  // záře
+  const zg = ctx.createRadialGradient(0, 0, 8, 0, 0, p.r + 26);
+  zg.addColorStop(0, 'rgba(255,246,208,.95)');
+  zg.addColorStop(.42, 'rgba(255,150,50,.85)');
+  zg.addColorStop(.75, 'rgba(230,57,70,.55)');
+  zg.addColorStop(1, 'rgba(230,57,70,0)');
+  ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(0, 0, p.r + 26, 0, 7); ctx.fill();
+  // olizující plameny po obvodu
+  ctx.fillStyle = 'rgba(255,196,90,.9)';
+  for (let i = 0; i < 10; i++){
+    const a = i * .628 + p.faze;
+    const rr = p.r * (.82 + Math.sin(p.faze * 5 + i) * .12);
+    ctx.beginPath(); ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, 8, 0, 7); ctx.fill();
+  }
+  // jádro
+  ctx.fillStyle = '#ffe9a8';
+  ctx.beginPath(); ctx.arc(0, 0, p.r * .45, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fffdf2';
+  ctx.beginPath(); ctx.arc(-4, -5, p.r * .22, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function kresliPopcorn(p){
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.faze * .6);
+  if (p.ohniva){
+    const zg = ctx.createRadialGradient(0, 0, 2, 0, 0, 26);
+    zg.addColorStop(0, 'rgba(255,190,90,.85)'); zg.addColorStop(1, 'rgba(255,60,20,0)');
+    ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(0, 0, 26, 0, 7); ctx.fill();
+  }
+  // ohon, ať je vidět, jak rychle letí
+  ctx.fillStyle = p.ohniva ? 'rgba(255,150,60,.4)' : 'rgba(255,246,208,.45)';
+  ctx.beginPath(); ctx.ellipse(14, 0, 18, 5, 0, 0, 7); ctx.fill();
+  // vypražený kukuřičný pukanec
+  if (p.vraceno){                                // odpálený pukanec svítí zlatě
+    const gg = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
+    gg.addColorStop(0, 'rgba(255,246,208,.9)'); gg.addColorStop(1, 'rgba(255,209,102,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, 0, 30, 0, 7); ctx.fill();
+  }
+  const zaklad = p.vraceno ? '#fff6d0' : p.ohniva ? '#ffd0a0' : '#fff8e6';
+  for (const [ox, oy, rr] of [[-4,-4,8],[5,-2,7],[0,5,7.5],[-6,4,5.5],[6,5,5]]){
+    ctx.fillStyle = zaklad;
+    ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill();
+    ctx.strokeStyle = p.vraceno ? '#a87613' : p.ohniva ? '#c2521f' : '#c9a86a';
+    ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.fillStyle = p.ohniva ? '#ff7a2f' : '#ffd166';
+  ctx.beginPath(); ctx.arc(0, 0, 3.6, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function kresliVlnu(p){
+  const y0 = p.kde === 'zem' ? ZEM - p.v : p.y - p.v/2;
+  const g = ctx.createLinearGradient(p.x - 26, 0, p.x + 26, 0);
+  g.addColorStop(0, 'rgba(201,160,255,0)');
+  g.addColorStop(.5, 'rgba(201,160,255,.55)');
+  g.addColorStop(1, 'rgba(201,160,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(p.x - 26, y0, 52, p.v);
+  ctx.strokeStyle = '#e0c8ff'; ctx.lineWidth = 3;
+  for (const o of [-14, 0, 14]){
+    ctx.beginPath();
+    for (let yy = y0; yy <= y0 + p.v; yy += 12)
+      ctx.lineTo(p.x + o + Math.sin(yy * .09 + p.faze) * 7, yy);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#f2e6ff';
+  ctx.beginPath(); ctx.arc(p.x, y0 + p.v/2, 6 + Math.sin(p.faze*2)*2, 0, 7); ctx.fill();
+}
+function kresliPavoucka(p){
+  const O = '#25102f';
+  ctx.strokeStyle = 'rgba(236,247,255,.55)'; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(p.x, STROP); ctx.lineTo(p.x, p.y); ctx.stroke();
+  ctx.save(); ctx.translate(p.x, p.y); ctx.lineJoin = 'round';
+  for (let i = 0; i < 3; i++) for (const sg of [-1, 1]){
+    const sw = Math.sin(p.faze * 2 + i) * .18;
+    koncetina(sg*5, -2, sg*(15 + i*3), -8 + sw*11, sg*(20 + i*4), 8 + i*5, 3.4, '#59307f', O);
+  }
+  const g = ctx.createRadialGradient(-3, -2, 2, 0, 2, 13);
+  g.addColorStop(0, '#9b62d6'); g.addColorStop(1, '#4a2470');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 3, 12, 11, 0, 0, 7); ctx.fill(); obtah(O, 2.2);
+  ctx.fillStyle = '#7f4bb0';
+  ctx.beginPath(); ctx.arc(0, -8, 7.5, 0, 7); ctx.fill(); obtah(O, 2);
+  ctx.fillStyle = '#ffe066';
+  for (const ox of [-3.2, 3.2]){
+    ctx.beginPath(); ctx.arc(ox, -9, 2.6, 0, 7); ctx.fill(); obtah(O, 1.2);
+    ctx.fillStyle = '#2b0f3a';
+    ctx.beginPath(); ctx.arc(ox, -9, 1.2, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffe066';
+  }
+  ctx.restore();
+}
+function kresliSit(p){
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.faze * .3);
+  ctx.strokeStyle = 'rgba(232,247,255,.75)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 8; i++){
+    const a = i * .785;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a)*p.r, Math.sin(a)*p.r); ctx.stroke();
+  }
+  for (const rr of [p.r*.35, p.r*.62, p.r*.9]){
+    ctx.beginPath();
+    for (let i = 0; i <= 8; i++){
+      const a = i * .785;
+      ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(232,247,255,.16)';
+  ctx.beginPath(); ctx.arc(0, 0, p.r*.9, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function kresliKruh(p){
+  const zl = p.vraceno;
+  const g = ctx.createRadialGradient(p.x, p.y, p.dira, p.x, p.y, p.r + 10);
+  g.addColorStop(0, zl ? 'rgba(255,230,120,0)' : 'rgba(255,120,40,0)');
+  g.addColorStop(.35, zl ? 'rgba(255,225,110,.85)' : 'rgba(255,150,50,.85)');
+  g.addColorStop(.75, zl ? 'rgba(255,180,40,.9)' : 'rgba(230,60,20,.9)');
+  g.addColorStop(1, zl ? 'rgba(255,180,40,0)' : 'rgba(230,60,20,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 10, 0, 7); ctx.fill();
+  // plamínky po obvodu
+  ctx.fillStyle = zl ? '#fff3c4' : '#ffd166';
+  for (let i = 0; i < 12; i++){
+    const a = i * .524 + p.faze;
+    const rr = (p.dira + p.r) / 2 + Math.sin(p.faze * 3 + i) * 5;
+    ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*rr, p.y + Math.sin(a)*rr, 4.5, 0, 7); ctx.fill();
+  }
+  ctx.strokeStyle = zl ? 'rgba(255,246,208,.9)' : 'rgba(255,220,150,.7)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(p.x, p.y, p.dira, 0, 7); ctx.stroke();
+  if (Math.random() < .4)
+    castice.push({x: p.x + nah(-p.r, p.r), y: p.y + nah(-p.r, p.r), vx: nah(-60, 60), vy: nah(-70, -10),
+                  zivot: nah(.2, .5), max: .5, barva: zl ? '#ffe066' : nahZ(['#ff7a2f','#e63946']), vel: nah(3, 6)});
+}
+
+function kresliBoss(b){
+  if (b.typ === 'vlk')    return kresliVlk(b);
+  if (b.typ === 'pavouk') return kresliPavouk(b);
+  if (b.typ === 'kohout') return kresliKohout(b);
+  if (b.blik > 0 && Math.floor(b.blik * 16) % 2 === 0) return;
+
+  // kouř, když je liška domlácená
+  if (b.zivoty <= 1 && Math.random() < .35)
+    castice.push({x: b.x + 40, y: b.y + nah(-6, 10), vx: nah(-160,-60), vy: nah(-70,-20),
+                  zivot: nah(.4,.9), max: .9, barva: nahZ(['#8d99ae','#6c757d','#adb5bd']), vel: nah(5,10)});
+
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(Math.sin(b.faze) * .06 + (b.stav === 'odlet' ? -.35 : 0));
+
+  // ocasní plochy
+  ctx.fillStyle = '#c33d3d';
+  ctx.beginPath(); ctx.moveTo(52, -4); ctx.lineTo(86, -44); ctx.lineTo(90, -2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8e2d0';
+  ctx.beginPath(); ctx.roundRect(60, -2, 40, 9, 4); ctx.fill();
+
+  // trup
+  const g = ctx.createLinearGradient(0, -30, 0, 32);
+  g.addColorStop(0, '#ff8a8a'); g.addColorStop(.45, '#e8484d'); g.addColorStop(1, '#a82a32');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 0, 76, 30, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#7d1f27'; ctx.lineWidth = 3; ctx.stroke();
+  // pruh
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath(); ctx.roundRect(-40, 6, 74, 8, 4); ctx.fill();
+
+  // spodní křídlo
+  ctx.fillStyle = '#f0a049';
+  ctx.beginPath(); ctx.roundRect(-52, 16, 104, 15, 7); ctx.fill();
+  ctx.strokeStyle = '#a86a24'; ctx.lineWidth = 2.5; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.beginPath(); ctx.roundRect(-46, 19, 40, 4, 2); ctx.fill();
+
+  // kokpit
+  ctx.fillStyle = 'rgba(205,240,255,.8)';
+  ctx.beginPath(); ctx.ellipse(-8, -24, 33, 22, 0, Math.PI, 0); ctx.fill();
+  ctx.strokeStyle = '#7d1f27'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.65)';
+  ctx.beginPath(); ctx.ellipse(-22, -30, 8, 5, -.5, 0, 7); ctx.fill();
+
+  // motor a vrtule
+  ctx.fillStyle = '#5a4033';
+  ctx.beginPath(); ctx.roundRect(-88, -12, 16, 24, 5); ctx.fill();
+  ctx.fillStyle = 'rgba(120,90,70,.25)';
+  ctx.beginPath(); ctx.ellipse(-92, 0, 7, 34, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(-92, 0); ctx.rotate(b.vrtule);
+  ctx.fillStyle = 'rgba(70,50,40,.85)';
+  ctx.beginPath(); ctx.roundRect(-3.5, -34, 7, 68, 3); ctx.fill();
+  ctx.restore();
+  // --- kukuřičný kanón pod trupem ---
+  const zp = b.zpetny || 0;
+  ctx.save();
+  ctx.translate(6 + zp * 9, 22);
+  ctx.fillStyle = '#6b7480';
+  ctx.beginPath(); ctx.roundRect(-84, -9, 96, 18, 8); ctx.fill();
+  ctx.strokeStyle = '#3f4753'; ctx.lineWidth = 2.6; ctx.stroke();
+  ctx.fillStyle = '#8b98a8';
+  ctx.beginPath(); ctx.roundRect(-80, -6, 60, 5, 2.5); ctx.fill();
+  // zlaté ústí ve tvaru kukuřičného klasu
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath(); ctx.ellipse(-84, 0, 10, 12, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#a87613'; ctx.lineWidth = 2.4; ctx.stroke();
+  ctx.fillStyle = '#e8a33c';
+  for (const yy of [-6, 0, 6]){ ctx.beginPath(); ctx.arc(-86, yy, 2.2, 0, 7); ctx.fill(); }
+  // zásobník kukuřice nahoře
+  ctx.fillStyle = '#3f9a5c';
+  ctx.beginPath(); ctx.roundRect(-24, -20, 26, 14, 5); ctx.fill();
+  ctx.strokeStyle = '#1f6b3c'; ctx.lineWidth = 2; ctx.stroke();
+  // záblesk při výstřelu
+  if (zp > .1){
+    const fg = ctx.createRadialGradient(-92, 0, 2, -92, 0, 34 * zp);
+    fg.addColorStop(0, 'rgba(255,246,208,' + zp + ')');
+    fg.addColorStop(.5, 'rgba(255,180,60,' + (zp * .7) + ')');
+    fg.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(-92, 0, 34 * zp, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(-92, 0, 6, 0, 7); ctx.fill();
+  ctx.restore();
+
+  // --- zaměřovací čára: máš chvilku uhnout ---
+  if (b.nabiti > 0 && b.stav === 'utoci'){
+    const a = Math.floor(b.nabiti * (b.zivoty === 1 ? 44 : 22)) % 2 ? .9 : .3;
+    ctx.strokeStyle = 'rgba(255,90,90,' + a + ')';
+    ctx.lineWidth = 2.5; ctx.setLineDash([14, 10]);
+    ctx.lineDashOffset = -hodiny * 120;
+    ctx.beginPath(); ctx.moveTo(b.x - 90, b.miri); ctx.lineTo(0, b.miri); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    ctx.fillStyle = 'rgba(255,90,90,' + a + ')';
+    ctx.beginPath(); ctx.arc(b.x - 96, b.miri, 5, 0, 7); ctx.fill();
+  }
+
+  // --- pilotka liška ---
+  const hx = b.x - 12, hy = b.y - 40;
+  ctx.save(); ctx.translate(hx, hy); ctx.rotate(Math.sin(b.faze) * .05);
+  // šála
+  ctx.fillStyle = '#e63946';
+  ctx.beginPath();
+  ctx.moveTo(6, 16);
+  ctx.quadraticCurveTo(40, 10 + Math.sin(b.faze*3)*8, 74, 22 + Math.sin(b.faze*3+1)*10);
+  ctx.quadraticCurveTo(42, 26 + Math.sin(b.faze*3)*8, 6, 26);
+  ctx.closePath(); ctx.fill();
+  // rohy v pekelné podobě
+  if (b.demon){
+    ctx.fillStyle = '#2b1116';
+    for (const s of [-1, 1]){
+      ctx.beginPath();
+      ctx.moveTo(s*14, -18);
+      ctx.quadraticCurveTo(s*34, -34, s*26, -54);
+      ctx.quadraticCurveTo(s*22, -36, s*8, -20);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  // uši
+  for (const s of [-1, 1]){
+    ctx.fillStyle = b.demon ? '#b8452a' : '#e07a3c';
+    ctx.beginPath(); ctx.moveTo(s*7, -14); ctx.lineTo(s*20, -36); ctx.lineTo(s*22, -10);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#f9c5b0';
+    ctx.beginPath(); ctx.moveTo(s*10, -15); ctx.lineTo(s*18, -29); ctx.lineTo(s*19, -13);
+    ctx.closePath(); ctx.fill();
+  }
+  // hlava
+  ctx.fillStyle = b.demon ? '#c9502c' : '#f0913f';
+  ctx.beginPath(); ctx.arc(0, 0, 21, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#b4642a'; ctx.lineWidth = 2; ctx.stroke();
+  // čumák
+  ctx.fillStyle = '#fff6ea';
+  ctx.beginPath(); ctx.ellipse(-14, 8, 15, 10, -.2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#3a2a20';
+  ctx.beginPath(); ctx.ellipse(-27, 5, 5, 4, -.2, 0, 7); ctx.fill();
+  // pilotní brýle
+  ctx.strokeStyle = '#5a4033'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(-20, -6); ctx.lineTo(20, -6); ctx.stroke();
+  for (const dx of [-11, 8]){
+    ctx.fillStyle = '#3a2a20';
+    ctx.beginPath(); ctx.arc(dx, -6, 10, 0, 7); ctx.fill();
+    ctx.fillStyle = b.stav === 'zasazena' ? '#ffb3b3' : b.demon ? '#ff5d3a' : '#9ad9ff';
+    ctx.beginPath(); ctx.arc(dx, -6, 7, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.arc(dx - 2.5, -8.5, 2.4, 0, 7); ctx.fill();
+  }
+  // pusa
+  ctx.strokeStyle = '#3a2a20'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (b.stav === 'zasazena'){ ctx.arc(-14, 14, 5, Math.PI, 0); }
+  else { ctx.moveTo(-22, 12); ctx.quadraticCurveTo(-14, 18, -6, 11); }
+  ctx.stroke();
+  ctx.restore();
+
+  // srdíčka nad bossem
+  for (let i = 0; i < b.zivoty; i++)
+    srdce(b.x - (b.zivoty - 1) * 15 + i * 30, b.y - 92, 11, '#ff5d73');
+}
+
+// ============ SLEPICE ============
+function kresliSlepici(velikost = 1, kdeX = null, kdeY = null, kopie = false){
+  const x = kdeX === null ? hrac.x : kdeX;
+  const y = kdeY === null ? hrac.y : kdeY;
+
+  if (kdeX === null){
+    const d = omez(1 - (ZEM - y) / 500, .05, .3);
+    stinPod(x, ZEM + 6, 22, d);
+    if (hrac.nesmrt > 0 && turbo <= 0 && Math.floor(hrac.nesmrt * 12) % 2 === 0) return;
+  }
+
+  if (turbo > 0 && kdeX === null){
+    const g = ctx.createRadialGradient(x, y, 6, x, y, 52);
+    g.addColorStop(0, 'rgba(255,255,255,.5)'); g.addColorStop(1, 'rgba(140,200,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 52, 0, 7); ctx.fill();
+    ctx.strokeStyle = DUHA[Math.floor(hodiny*16) % DUHA.length]; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 34 + Math.sin(hodiny*25)*3, 0, 7); ctx.stroke();
+  }
+
+  if (stit && kdeX === null){
+    const bg = ctx.createRadialGradient(x, y, 14, x, y, 40);
+    bg.addColorStop(0, 'rgba(116,212,255,.05)'); bg.addColorStop(.75, 'rgba(116,212,255,.22)');
+    bg.addColorStop(1, 'rgba(214,242,255,.5)');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, 40, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(180,235,255,.85)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(x, y, 39, 0, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    ctx.beginPath(); ctx.ellipse(x - 15, y - 20, 6, 3.5, -.6, 0, 7); ctx.fill();
+  }
+  const m = (1 + hrac.puls * .16) * .92 * velikost * ((kdeX === null || kopie) && maly > 0 ? .6 : 1);
+  const t = 1 - hrac.mavF;
+  const uhelKridla = -1.25 * Math.sin(t * Math.PI) + Math.sin(hodiny*6) * .1;
+  const mrka = Math.sin(hodiny * 2.7) > .955;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(m, m * (kdeX === null || kopie ? gravSmer : 1));   // obrácená gravitace = vzhůru nohama
+  if (kdeX === null || kopie) ctx.rotate(hrac.uhel);
+  else ctx.rotate(Math.sin(hodiny*1.6) * .06);
+
+  const B = paleta();
+  const obrys = B.obrys;
+  ctx.lineJoin = 'round';
+
+  // --- ocasní pera ---
+  for (let i = 0; i < 3; i++){
+    ctx.save(); ctx.translate(-22, -4); ctx.rotate(-.5 + i * .38 + Math.sin(hodiny*5)*.05);
+    ctx.fillStyle = i === 1 ? B.pero : B.a;
+    ctx.beginPath(); ctx.ellipse(-13, 0, 16, 6, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = obrys; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.restore();
+  }
+
+  // --- nohy ---
+  ctx.strokeStyle = '#f08c1e'; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+  for (const dx of [-4, 5]){
+    ctx.beginPath(); ctx.moveTo(dx, 15); ctx.lineTo(dx - 7, 25); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(dx - 7, 25); ctx.lineTo(dx - 13, 24); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(dx - 7, 25); ctx.lineTo(dx - 12, 28); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+
+  // --- tělo ---
+  const gt = ctx.createLinearGradient(0, -20, 0, 20);
+  gt.addColorStop(0, B.a); gt.addColorStop(.65, B.b); gt.addColorStop(1, B.c);
+  ctx.fillStyle = gt;
+  ctx.beginPath(); ctx.ellipse(0, 0, 25, 20, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = obrys; ctx.lineWidth = 2.6; ctx.stroke();
+
+  // --- křídlo ---
+  ctx.save(); ctx.translate(-3, -3); ctx.rotate(uhelKridla);
+  const gk = ctx.createLinearGradient(0, -8, 0, 10);
+  gk.addColorStop(0, B.k1); gk.addColorStop(1, B.k2);
+  ctx.fillStyle = gk;
+  ctx.beginPath(); ctx.ellipse(-2, 2, 16, 11, .15, 0, 7); ctx.fill();
+  ctx.strokeStyle = obrys; ctx.lineWidth = 2.4; ctx.stroke();
+  ctx.strokeStyle = obrys; ctx.globalAlpha = .5; ctx.lineWidth = 1.6;
+  for (let i = -1; i <= 1; i++){
+    ctx.beginPath(); ctx.moveTo(-14 + i*5, 2 + i); ctx.lineTo(-3 + i*5, 9); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // --- hlava ---
+  ctx.fillStyle = B.a;
+  ctx.beginPath(); ctx.arc(16, -15, 13.5, 0, 7); ctx.fill();
+  ctx.strokeStyle = obrys; ctx.lineWidth = 2.6; ctx.stroke();
+
+  // zobák
+  ctx.fillStyle = '#ffa726';
+  ctx.beginPath(); ctx.moveTo(26, -19); ctx.lineTo(41, -13); ctx.lineTo(26, -7); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = obrys; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = 'rgba(90,60,30,.7)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(26.5, -13); ctx.lineTo(40, -13); ctx.stroke();
+  // lalok
+  ctx.fillStyle = '#e63946';
+  ctx.beginPath(); ctx.arc(25, -4, 5, 0, 7); ctx.fill();
+  ctx.strokeStyle = obrys; ctx.lineWidth = 1.8; ctx.stroke();
+
+  // oko
+  if (mrka){
+    ctx.strokeStyle = '#3a2a20'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(16, -18); ctx.lineTo(24, -18); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(20, -18, 5.4, 0, 7); ctx.fill();
+    ctx.strokeStyle = obrys; ctx.lineWidth = 1.6; ctx.stroke();
+    ctx.fillStyle = '#241c14';
+    ctx.beginPath(); ctx.arc(21.4, -18, 2.8, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(20.4, -19.2, 1.1, 0, 7); ctx.fill();
+  }
+
+  // --- HELMA ---
+  const barvaHelmy = turbo > 0 ? '#ffc233' : '#e63946';
+  const tmavaHelmy = turbo > 0 ? '#c78e14' : '#a8232e';
+  ctx.save();
+  ctx.beginPath(); ctx.arc(16, -17, 16.5, Math.PI, Math.PI*2); ctx.closePath();
+  ctx.clip();
+  const gh = ctx.createLinearGradient(0, -34, 0, -17);
+  gh.addColorStop(0, turbo > 0 ? '#ffe08a' : '#ff6b6b'); gh.addColorStop(1, barvaHelmy);
+  ctx.fillStyle = gh; ctx.fillRect(-2, -36, 40, 22);
+  ctx.fillStyle = '#fff8e7'; ctx.fillRect(13, -36, 6.5, 22);      // bílý pruh
+  ctx.restore();
+  ctx.strokeStyle = tmavaHelmy; ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.arc(16, -17, 16.5, Math.PI, Math.PI*2); ctx.stroke();
+  // kšilt
+  ctx.fillStyle = barvaHelmy;
+  ctx.beginPath(); ctx.roundRect(-1, -19.5, 40, 6, 3); ctx.fill();
+  ctx.strokeStyle = tmavaHelmy; ctx.lineWidth = 2; ctx.stroke();
+  // lesk
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(16, -17, 11, Math.PI*1.12, Math.PI*1.42); ctx.stroke();
+  ctx.lineCap = 'butt';
+  // pásek pod bradou
+  ctx.strokeStyle = '#4a3428'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(3, -18); ctx.quadraticCurveTo(4, -4, 14, -2); ctx.stroke();
+
+  ctx.restore();
+}
+
+// ============ DUCH REKORDU ============
+function kresliDucha(){
+  if (rekordUjeto <= 0 || rekordPrekonan) return;
+  if (stav !== 'hra' && stav !== 'padam') return;
+  const gx = hrac.x + (rekordUjeto - ujeto);
+  if (gx < -140 || gx > Š + 140) return;
+  ctx.save();
+  ctx.setLineDash([13, 11]);
+  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(gx, 52); ctx.lineTo(gx, ZEM); ctx.stroke();
+  ctx.setLineDash([]);
+  napis('TVŮJ REKORD', gx, 40, '#ffffff', 'bold 17px system-ui', 5);
+  ctx.globalAlpha = .35;
+  kresliSlepici(1, gx, 250 + Math.sin(hodiny * 2) * 30);
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+// ============ DÉŠŤ A BLESK ============
+function kresliCaryRychlosti(){
+  if (zrychleniCas <= 0) return;
+  ctx.strokeStyle = 'rgba(255,220,170,.35)'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < 16; i++){
+    const y = (i * 37 + (hodiny * 900) % 37) % V;
+    const x = (Š - ((hodiny * 1400 + i * 211) % (Š + 260)));
+    ctx.moveTo(x, y); ctx.lineTo(x + 70, y);
+  }
+  ctx.stroke();
+}
+
+function kresliDest(dt){
+  if (bourkaSila <= 0) return;
+  ctx.strokeStyle = 'rgba(195,220,255,' + (.55 * bourkaSila) + ')';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const k of KAPKY){
+    k.y += k.s * dt; k.x -= k.s * .32 * dt;
+    if (k.y > V){ k.y = -25; k.x = nah(0, Š + 260); }
+    if (k.x < -50) k.x = Š + 50;
+    ctx.moveTo(k.x, k.y); ctx.lineTo(k.x - k.d * .32, k.y + k.d);
+  }
+  ctx.stroke();
+
+  if (blesk > .35){
+    ctx.strokeStyle = 'rgba(255,255,255,' + blesk + ')';
+    ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(bleskX, 0);
+    let x = bleskX;
+    for (let i = 1; i <= 6; i++){ x += nah(-28, 28); ctx.lineTo(x, i * ZEM / 6); }
+    ctx.stroke();
+  }
+}
+
+// ============ KAMARÁD ============
+function kresliHonice(h){
+  const B = h.demon ? '255,150,90' : '226,244,255';
+  const bob = Math.sin(h.faze * 1.4) * 6;
+  ctx.save();
+  ctx.translate(h.x, h.y + bob);
+  // mlžný chvost
+  for (let i = 4; i >= 1; i--){
+    ctx.fillStyle = 'rgba(' + B + ',' + (.1 * i * .5) + ')';
+    ctx.beginPath(); ctx.ellipse(-i * 13, i * 2, 18 - i * 2, 13 - i, 0, 0, 7); ctx.fill();
+  }
+  const zg = ctx.createRadialGradient(0, -4, 4, 0, 0, 46);
+  zg.addColorStop(0, 'rgba(' + B + ',.4)'); zg.addColorStop(1, 'rgba(' + B + ',0)');
+  ctx.fillStyle = zg; ctx.beginPath(); ctx.arc(0, 0, 46, 0, 7); ctx.fill();
+  // tělo
+  ctx.fillStyle = 'rgba(' + B + ',.93)';
+  ctx.beginPath();
+  ctx.moveTo(-19, 12);
+  ctx.quadraticCurveTo(-19, -28, 0, -28);
+  ctx.quadraticCurveTo(19, -28, 19, 12);
+  for (let i = 0; i < 4; i++){
+    const x1 = 19 - i * 9.5, x2 = 19 - (i + .5) * 9.5;
+    ctx.quadraticCurveTo(x2, 12 + (i % 2 ? -9 : 9) + Math.sin(h.faze * 3 + i) * 3, x1 - 9.5, 12);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = h.demon ? 'rgba(200,60,20,.65)' : 'rgba(120,170,210,.7)';
+  ctx.lineWidth = 2.4; ctx.stroke();
+  // strašidelná tvář
+  ctx.fillStyle = h.demon ? 'rgba(70,10,10,.92)' : 'rgba(28,38,68,.92)';
+  ctx.beginPath(); ctx.ellipse(-6.5, -10, 4, 5.5, 0, 0, 7); ctx.ellipse(6.5, -10, 4, 5.5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 2, 5, 4.5, 0, 0, 7); ctx.fill();
+  if (h.demon){
+    ctx.fillStyle = '#ff7a2f';
+    ctx.beginPath(); ctx.arc(-6.5, -10, 1.8, 0, 7); ctx.arc(6.5, -10, 1.8, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function kresliKostlivce(k){
+  const skok = Math.sin(k.faze) * 3;
+  const K = '#f4f0e4', T = '#2b1c20';
+  ctx.save(); ctx.translate(k.x, k.y + skok);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // kostěná křidélka
+  for (const sg of [-1, 1]){
+    const m = Math.sin(k.faze) * 6;
+    ctx.strokeStyle = T; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(sg * 6, -2); ctx.lineTo(sg * 20, -8 - m); ctx.stroke();
+    ctx.strokeStyle = K; ctx.lineWidth = 2.6; ctx.stroke();
+    ctx.strokeStyle = T; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(sg * 20, -8 - m); ctx.lineTo(sg * 27, 2 - m); ctx.stroke();
+    ctx.strokeStyle = K; ctx.lineWidth = 2;  ctx.stroke();
+  }
+  // tělo se žebry
+  ctx.fillStyle = T;
+  ctx.beginPath(); ctx.ellipse(0, 2, 13, 12, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = K;
+  ctx.beginPath(); ctx.ellipse(0, 2, 10.5, 9.5, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(43,28,32,.45)'; ctx.lineWidth = 1.5;
+  for (const rx of [-4, 0, 4]){ ctx.beginPath(); ctx.moveTo(rx, -5); ctx.lineTo(rx, 9); ctx.stroke(); }
+  // lebka
+  ctx.fillStyle = T;
+  ctx.beginPath(); ctx.arc(-9, -13, 9, 0, 7); ctx.fill();
+  ctx.fillStyle = K;
+  ctx.beginPath(); ctx.arc(-9, -13, 7.2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ff9f43';
+  ctx.beginPath(); ctx.arc(-12, -14, 2.3, 0, 7); ctx.arc(-6, -14, 2.1, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffb347';
+  ctx.beginPath(); ctx.moveTo(-16, -12); ctx.lineTo(-25, -10); ctx.lineTo(-16, -8);
+  ctx.closePath(); ctx.fill();
+  // ocásek z kostičky
+  ctx.strokeStyle = T; ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(11, -3); ctx.lineTo(20, -9); ctx.stroke();
+  ctx.strokeStyle = K; ctx.lineWidth = 2.4; ctx.stroke();
+  ctx.restore();
+}
+
+function kresliPoleOci(){
+  for (const o of POLE_OCI){
+    if (o.mrk < 0) continue;
+    const bar = o.demon ? '255,120,40' : '255,225,120';
+    for (const ox of [-7, 7]){
+      const g = ctx.createRadialGradient(o.x + ox, o.y, 0, o.x + ox, o.y, 15);
+      g.addColorStop(0, 'rgba(' + bar + ',.85)'); g.addColorStop(1, 'rgba(' + bar + ',0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x + ox, o.y, 15, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(' + bar + ',.95)';
+      ctx.beginPath(); ctx.ellipse(o.x + ox, o.y, 3.8, 2.8, 0, 0, 7); ctx.fill();
+    }
+  }
+}
+
+function kresliKamarada(k){
+  const mav = Math.sin(k.faze);
+  ctx.save(); ctx.translate(k.x, k.y);
+  ctx.fillStyle = '#7a67ae'; ctx.strokeStyle = '#4b3c7c'; ctx.lineWidth = 2;
+  for (const sgn of [-1, 1]){
+    ctx.save(); ctx.scale(sgn, 1);
+    ctx.beginPath();
+    ctx.moveTo(5, -2);
+    ctx.quadraticCurveTo(20, -14 - mav*8, 32, -3 - mav*11);
+    ctx.quadraticCurveTo(26, 3 - mav*3, 23, 8 - mav*5);
+    ctx.quadraticCurveTo(16, 1, 12, 8);
+    ctx.quadraticCurveTo(9, 2, 5, 6);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.fillStyle = '#65559a';
+  ctx.beginPath(); ctx.ellipse(0, 0, 10, 12, 0, 0, 7); ctx.fill(); ctx.stroke();
+  for (const sgn of [-1, 1]){
+    ctx.beginPath(); ctx.moveTo(sgn*3, -9); ctx.lineTo(sgn*8, -21); ctx.lineTo(sgn*9, -7);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(-4, -2, 3.8, 0, 7); ctx.arc(4, -2, 3.8, 0, 7); ctx.fill();
+  ctx.fillStyle = '#221c33';
+  ctx.beginPath(); ctx.arc(-3.4, -2, 2, 0, 7); ctx.arc(4.6, -2, 2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(-4.4, -3.2, .9, 0, 7); ctx.arc(3.6, -3.2, .9, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#221c33'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(0, 3, 3.6, .25, Math.PI - .25); ctx.stroke();
+  ctx.restore();
+  srdce(k.x + 15, k.y - 22 + Math.sin(k.faze * .35) * 3, 6, '#ff8fb1');
+}
+
+// ============ MEDAILE ============
+function kresliMedaili(x, y, r, druh){
+  const barvy = [['#e6ecf3','#b9c4d2','#8a95a6'], ['#f0b078','#cd7f32','#8c5522'],
+                 ['#ffffff','#c8d0dc','#8d97a6'], ['#fff3b0','#ffd166','#c9901a']];
+  const B = barvy[druh];
+  // stuhy
+  ctx.fillStyle = '#4a7fd4';
+  ctx.beginPath(); ctx.moveTo(x - r*.72, y - r*.45); ctx.lineTo(x - r*.2, y - r*2.05);
+  ctx.lineTo(x + r*.2, y - r*1.9); ctx.lineTo(x - r*.18, y - r*.35); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e05252';
+  ctx.beginPath(); ctx.moveTo(x + r*.72, y - r*.45); ctx.lineTo(x + r*.2, y - r*2.05);
+  ctx.lineTo(x - r*.2, y - r*1.9); ctx.lineTo(x + r*.18, y - r*.35); ctx.closePath(); ctx.fill();
+  // kolečko
+  const g = ctx.createRadialGradient(x - r*.35, y - r*.35, r*.1, x, y, r);
+  g.addColorStop(0, B[0]); g.addColorStop(.55, B[1]); g.addColorStop(1, B[2]);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.strokeStyle = B[2]; ctx.lineWidth = 3.5; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.22)';
+  ctx.beginPath(); ctx.arc(x, y, r*.74, 0, 7); ctx.fill();
+  // hvězda
+  ctx.fillStyle = B[2];
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++){
+    const a = -Math.PI/2 + i * Math.PI/5, rr = i % 2 ? r*.24 : r*.54;
+    ctx.lineTo(x + Math.cos(a)*rr, y + Math.sin(a)*rr);
+  }
+  ctx.closePath(); ctx.fill();
+  if (druh === 3){
+    for (let i = 0; i < 5; i++){
+      const a = hodiny * 1.3 + i * 1.26, rr = r * 1.32 + Math.sin(hodiny*3 + i) * 5;
+      ctx.fillStyle = 'rgba(255,255,220,.9)';
+      ctx.beginPath(); ctx.arc(x + Math.cos(a)*rr, y + Math.sin(a)*rr, 2.8, 0, 7); ctx.fill();
+    }
+  }
+}
+
+// ============ HUD ============
+function ikonaZvuku(x, y, zap){
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(x - 9, y - 4); ctx.lineTo(x - 4, y - 4); ctx.lineTo(x + 2, y - 11);
+  ctx.lineTo(x + 2, y + 11); ctx.lineTo(x - 4, y + 4); ctx.lineTo(x - 9, y + 4);
+  ctx.closePath(); ctx.fill();
+  ctx.lineWidth = 2.4; ctx.strokeStyle = '#ffffff';
+  if (zap){
+    ctx.beginPath(); ctx.arc(x + 3, y, 8, -.9, .9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + 3, y, 13, -.9, .9); ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#ff8a8a';
+    ctx.beginPath(); ctx.moveTo(x + 7, y - 6); ctx.lineTo(x + 17, y + 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 17, y - 6); ctx.lineTo(x + 7, y + 6); ctx.stroke();
+  }
+}
+
+function kresliHUD(){
+  // panel body
+  ctx.textAlign = 'left';
+  obdelnikR(16, 12, 178, 40, 12, 'rgba(15,25,40,.45)');
+  napis('BODY  ' + skore, 30, 33, '#ffe066', 'bold 25px system-ui', 5);
+
+  // srdíčka
+  for (let i = 0; i < 3; i++)
+    srdce(Š/2 - 34 + i*34, 30, 13, i < hrac.zivoty ? '#ff5d73' : 'rgba(255,255,255,.22)');
+
+  // kukuřice
+  obdelnikR(Š - 200, 12, 130, 40, 12, 'rgba(15,25,40,.45)');
+  ctx.save(); ctx.translate(Š - 176, 32); ctx.scale(.62, .62);
+  kresliZrno({x: 0, y: 0, faze: 0});
+  ctx.restore();
+  napis('' + zrnka, Š - 152, 33, '#ffffff', 'bold 25px system-ui', 5);
+
+  // zvuk
+  ikonaZvuku(Š - 34, 68, zvuk.stav);
+
+  // obrácená gravitace
+  if (gravSmer === -1 && stav !== 'menu'){
+    ctx.textAlign = 'center';
+    obdelnikR(Š/2 - 96, 50, 192, 30, 10, 'rgba(120,60,200,.55)');
+    napis('OBRÁCENÁ GRAVITACE', Š/2, 66, '#e0b3ff', 'bold 17px system-ui', 4);
+    ctx.textAlign = 'left';
+  }
+  if (maly > 0 && stav === 'hra'){
+    ctx.textAlign = 'center';
+    obdelnikR(Š/2 - 78, 86, 156, 26, 9, 'rgba(30,120,70,.55)');
+    napis('MALÁ SLEPICE', Š/2, 99, '#b6f5cd', 'bold 15px system-ui', 4);
+    ctx.textAlign = 'left';
+  }
+  if (stav === 'hra'){
+    let bx = 300;
+    const odznak = (text, barva, poz) => {
+      const w = 8 + text.length * 10;
+      obdelnikR(bx, 88, w, 24, 8, poz);
+      napis(text, bx + w/2, 100, barva, 'bold 14px system-ui', 4);
+      bx += w + 8;
+    };
+    ctx.textAlign = 'center';
+    if (stit)          odznak('ŠTÍT', '#d6f2ff', 'rgba(20,110,170,.55)');
+    if (magnet > 0)    odznak('MAGNET', '#ffd7d7', 'rgba(170,30,40,.55)');
+    if (zpomaleni > 0) odznak('ZPOMALENÍ', '#d3fbff', 'rgba(20,140,150,.55)');
+    if (lepkavy > 0)   odznak('PAVUČINA', '#e8f7ff', 'rgba(120,120,150,.55)');
+    if (nesmrtelny)    odznak('TEST: NESMRTELNOST', '#d3ffd9', 'rgba(30,120,50,.6)');
+    if (admin)         odznak('ADMIN', '#ffe9b0', 'rgba(120,80,10,.6)');
+    if (demonSila() > .4) odznak('PEKLO', '#ffc9a0', 'rgba(150,20,10,.6)');
+    ctx.textAlign = 'left';
+  }
+  // --- panel testovacího režimu ---
+  if (admin && adminPanel && stav === 'hra'){
+    const rady = [
+      '1 den   2 západ   3 noc   4 PEKLO',
+      '5 vlk   6 pavoučice   7 kohout   8 liška',
+      'T turbo   S štít   G magnet   C zpomalení',
+      'H +srdíčko   N nesmrtelnost   P portál   B bouřka',
+      'O úklid   + / - čas o 30 s   ` skrýt   Esc vypnout'
+    ];
+    obdelnikR(12, V - 162, 372, 122, 10, 'rgba(10,14,26,.68)');
+    ctx.textAlign = 'left';
+    napis('TESTOVACÍ REŽIM', 24, V - 144, '#ffe066', 'bold 15px system-ui', 4);
+    for (const [i, t] of rady.entries())
+      napis(t, 24, V - 124 + i * 19, '#cfe3ff', '14px system-ui', 3);
+    ctx.textAlign = 'center';
+  }
+  if (dvojce > 0 && stav === 'hra'){
+    ctx.textAlign = 'center';
+    obdelnikR(Š/2 - 70, 150, 140, 26, 9, 'rgba(190,40,100,.55)');
+    napis('DVĚ SLEPICE', Š/2, 163, '#ffc2d8', 'bold 15px system-ui', 4);
+    ctx.textAlign = 'left';
+  }
+  if (zrychleniCas > 0 && stav === 'hra'){
+    ctx.textAlign = 'center';
+    obdelnikR(Š/2 - 62, 118, 124, 26, 9, 'rgba(180,90,20,.55)');
+    napis('ZRYCHLENÍ', Š/2, 131, '#ffd7a0', 'bold 15px system-ui', 4);
+    ctx.textAlign = 'left';
+  }
+  // kombo
+  if (kombo >= 2 && stav === 'hra')
+    napis('KOMBO ' + kombo, 30, 74, '#ff9f1c', 'bold 22px system-ui', 5);
+
+  // turbo
+  if (turbo > 0){
+    obdelnikR(24, 88, 210, 18, 9, 'rgba(15,25,40,.5)');
+    const g = ctx.createLinearGradient(26, 0, 232, 0);
+    DUHA.forEach((c, i) => g.addColorStop(i / (DUHA.length - 1), c));
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(26, 90, 206 * Math.min(1, turbo/5), 14, 7); ctx.clip();
+    ctx.fillStyle = g; ctx.fillRect(26, 90, 206, 14);
+    ctx.restore();
+    napis('TURBO', 244, 98, '#ffffff', 'bold 17px system-ui', 4);
+  }
+
+  ctx.textAlign = 'center';
+  if (rozjezd > 0 && stav === 'hra'){
+    ctx.globalAlpha = Math.min(1, rozjezd / 1.2);
+    napis('rozlet…', Š/2, 150, '#ffffff', 'bold 26px system-ui', 5);
+    ctx.globalAlpha = 1;
+  }
+  // varování před bossem
+  if (!boss && bossCas < 3 && stav === 'hra' && Math.floor(bossCas * 6) % 2 === 0)
+    napis('POZOR!  ' + jmenoBosse(demonSila() > .4 ? 'liska' : BOSSI[bossRada % 4], demonSila() > .4),
+          Š/2, 112, '#ffe066', 'bold 38px system-ui', 7);
+  // nápověda na bosse
+  if (boss && boss.stav !== 'odlet')
+    napis(radaBosse(boss.typ), Š/2, V - 26, '#ffffff', 'bold 21px system-ui', 5);
+  // kukuřice v ruce proti vlkovi
+  if (boss && boss.typ === 'vlk' && stav === 'hra'){
+    ctx.textAlign = 'center';
+    obdelnikR(Š/2 - 96, V - 74, 192, 30, 10, 'rgba(60,40,10,.6)');
+    napis('KUKUŘICE: ' + naboje + ' / 3', Š/2, V - 59, naboje > 0 ? '#ffe066' : '#c9c0a8',
+          'bold 19px system-ui', 5);
+    ctx.textAlign = 'left';
+  }
+}
+
+function kresliDash(){
+  if (dashCas <= 0) return;
+  const t = 1 - dashCas / 1.2;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, dashCas * 1.7);
+  ctx.translate(Š/2, V/2 - 50);
+  ctx.rotate(-.07);
+  ctx.scale(1 + t * .55, 1 + t * .55);
+  const g = ctx.createLinearGradient(-220, 0, 220, 0);
+  DUHA.forEach((c, i) => g.addColorStop(i / (DUHA.length - 1), c));
+  ctx.font = 'bold 88px system-ui';
+  ctx.lineWidth = 12; ctx.lineJoin = 'round'; ctx.strokeStyle = '#12131c';
+  ctx.strokeText('DASH!  x' + dashCislo, 0, 0);
+  ctx.fillStyle = g; ctx.fillText('DASH!  x' + dashCislo, 0, 0);
+  napis('+5 bodů', 0, 62, '#ffffff', 'bold 26px system-ui', 6);
+  ctx.restore();
+}
+
+function prekryv(){
+  ctx.fillStyle = 'rgba(8,16,30,.62)'; ctx.fillRect(0, 0, Š, V);
+  const kš = 730, kv = stav === 'menu' ? 406 : 322;
+  const kx = (Š - kš)/2, ky = V/2 - kv/2 + (stav === 'menu' ? 46 : 30);
+  obdelnikR(kx, ky, kš, kv, 22, 'rgba(16,28,48,.88)', 'rgba(255,255,255,.25)', 3);
+  ctx.textAlign = 'center';
+
+  if (stav === 'menu'){
+    const g = ctx.createLinearGradient(Š/2 - 240, 0, Š/2 + 240, 0);
+    g.addColorStop(0, '#ffd166'); g.addColorStop(.5, '#ffffff'); g.addColorStop(1, '#74c0fc');
+    ctx.font = 'bold 74px system-ui';
+    ctx.lineWidth = 12; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0b1220';
+    ctx.strokeText('FLAPPY DASH', Š/2, ky + 62);
+    ctx.fillStyle = g; ctx.fillText('FLAPPY DASH', Š/2, ky + 62);
+    napis('slepice v helmě', Š/2, ky + 108, '#ffe066', 'italic 23px system-ui', 4);
+    napis('Do trubky ani na zem nesmíš narazit — to je hned konec!', Š/2, ky + 152, '#ffb3b3', 'bold 23px system-ui', 4);
+    napis('Bílo-červená pruhovaná trubka dává 5 bodů, kukuřice 3.', Š/2, ky + 186, '#e8f4ff', '23px system-ui', 4);
+    napis('Duhové pírko = turbo   •   fialovým portálem letíš vzhůru nohama!', Š/2, ky + 220, '#e8f4ff', '23px system-ui', 4);
+    napis('Začínáš s jedním srdíčkem — zlaté vejce od lišky ti přidá další.', Š/2, ky + 254, '#9fd4ef', '20px system-ui', 4);
+
+    // výběr barvy slepice
+    const jm = barvaSlepice === 3 ? 'DUHOVÁ (tajná!)' : BARVY_SLEPICE[barvaSlepice].jm;
+    napis('šipkami vyber slepici:   ' + jm, Š/2, ky + 296, '#ffffff', 'bold 23px system-ui', 5);
+    if (!tajnaOdemcena)
+      napis('tajná čtvrtá slepice se odemkne, až sestřelíš lišku', Š/2, ky + 318, '#9fd4ef', '16px system-ui', 4);
+    const bR = ['#8ce99a', '#ffe066', '#ff6b6b'][rezim];
+    napis('šipky nahoru/dolů — hra:   ' + REZIMY[rezim].jm, Š/2, ky + 346, bR, 'bold 22px system-ui', 5);
+    ctx.fillStyle = '#ffe066';
+    const sx = Š/2 - 190, dx = Š/2 + 190;
+    ctx.beginPath(); ctx.moveTo(sx, ky + 296); ctx.lineTo(sx + 16, ky + 288); ctx.lineTo(sx + 16, ky + 304); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(dx, ky + 296); ctx.lineTo(dx - 16, ky + 288); ctx.lineTo(dx - 16, ky + 304); ctx.closePath(); ctx.fill();
+
+    napis('Zmáčkni cokoliv a leť!', Š/2, ky + 384, '#ffe066', 'bold 28px system-ui', 6);
+  } else {
+    const h = bossPorazeno >= 2 ? 'Postrach lišek!'
+            : bossPorazeno >= 1 ? 'Sestřelila jsi lišku!'
+            : skore >= 30 ? 'Ta helma se vyplatila.'
+            : skore >= 12 ? 'Slušný let.'
+            :               'Peří všude.';
+    const medaile = skore >= 60 ? 3 : skore >= 30 ? 2 : skore >= 12 ? 1 : 0;
+    const jmenoM = ['PÍRKO ZA SNAHU', 'BRONZOVÁ MEDAILE', 'STŘÍBRNÁ MEDAILE', 'ZLATÁ MEDAILE'][medaile];
+    const barvaM = ['#dbe3ec', '#f0b078', '#e8eef6', '#ffd166'][medaile];
+    kresliMedaili(Š/2, ky - 26, 44, medaile);
+    napis('DOLÉTÁNO!', Š/2, ky + 50, '#ffffff', 'bold 52px system-ui', 9);
+    napis(jmenoM, Š/2, ky + 96, barvaM, 'bold 30px system-ui', 6);
+    napis('BODY  ' + skore, Š/2, ky + 148, '#ffe066', 'bold 44px system-ui', 8);
+    napis('kukuřice ' + zrnka + '     portálů ' + statPortaly +
+          '     vzhůru nohama ' + statObracene.toFixed(1) + ' s',
+          Š/2, ky + 190, '#9fd4ef', '21px system-ui', 4);
+    napis('nejdelší kombo ' + statKombo + '     sestřelených lišek ' + bossPorazeno +
+          '     nejlepší dneska ' + rekord,
+          Š/2, ky + 218, '#9fd4ef', '21px system-ui', 4);
+    if (statPeklo > 0){                       // razítko za přežité peklo
+      const rx = kx + kš - 74, ry = ky + 62;
+      ctx.save(); ctx.translate(rx, ry); ctx.rotate(-.22);
+      ctx.strokeStyle = '#ff5d3a'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(0, 0, 44, 0, 7); ctx.stroke();
+      ctx.globalAlpha = .18; ctx.fillStyle = '#ff5d3a';
+      ctx.beginPath(); ctx.arc(0, 0, 42, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
+      // plamínek
+      ctx.fillStyle = '#ff7a2f';
+      ctx.beginPath(); ctx.moveTo(0, -26);
+      ctx.quadraticCurveTo(14, -8, 8, 4); ctx.quadraticCurveTo(0, 12, -8, 4);
+      ctx.quadraticCurveTo(-14, -8, 0, -26); ctx.fill();
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.moveTo(0, -14);
+      ctx.quadraticCurveTo(7, -4, 4, 2); ctx.quadraticCurveTo(0, 7, -4, 2);
+      ctx.quadraticCurveTo(-7, -4, 0, -14); ctx.fill();
+      napis('PEKLO x' + statPeklo, 0, 24, '#ffd7c0', 'bold 15px system-ui', 4);
+      ctx.restore();
+    }
+    napis(h, Š/2, ky + 254, '#ffffff', 'bold 30px system-ui', 6);
+    napis('Zmáčkni cokoliv a leť znovu', Š/2, ky + 294, '#c9f2b5', '23px system-ui', 5);
+
+    if (medaile === 3){                       // za zlato vyjedou titulky
+      const y0 = V - 68, vy = 64, krokT = 30;
+      ctx.save();
+      obdelnikR(Š/2 - 310, y0, 620, vy, 14, 'rgba(8,16,32,.6)');
+      ctx.beginPath(); ctx.rect(Š/2 - 310, y0, 620, vy); ctx.clip();
+      const celkem = TITULKY.length * krokT + vy;
+      TITULKY.forEach((t, i) => {
+        const y = y0 + vy + i * krokT - (titulkyPosun % celkem);
+        if (y > y0 - 30 && y < y0 + vy + 30)
+          napis(t, Š/2, y, i === 0 ? '#ffd166' : '#e8f4ff',
+                (i === 0 ? 'bold 21px' : '19px') + ' system-ui', 4);
+      });
+      ctx.restore();
+    }
+  }
+}
+
+function kresli(dt){
+  ctx.save();
+  if (otres > 0) ctx.translate(nah(-otres, otres), nah(-otres, otres));
+  kresliPozadi(dt);
+  for (const p of prekazky) stinPrekazky(p);         // nejdřív všechny stíny na zem
+  for (const p of prekazky){
+    if (p.typ === 'trubka') kresliTrubku(p);
+    else if (p.typ === 'pila') kresliPilu(p);
+    else if (p.typ === 'ostny') kresliOstny(p);
+    else if (p.typ === 'netopyr') kresliNetopyra(p);
+    else if (p.typ === 'zrno') kresliZrno(p);
+    else if (p.typ === 'steblo') kresliSteblo(p);
+    else if (p.typ === 'strasak') kresliStrasak(p);
+    else if (p.typ === 'portal') kresliPortal(p);
+    else if (p.typ === 'pirko') kresliPirko(p);
+    else if (p.typ === 'vejce') kresliVejce(p);
+    else if (p.typ === 'vlna') kresliVlnu(p);
+    else if (p.typ === 'pavoucek') kresliPavoucka(p);
+    else if (p.typ === 'sit') kresliSit(p);
+    else if (p.typ === 'kruh') kresliKruh(p);
+    else if (p.typ === 'strela') kresliPopcorn(p);
+    else if (p.typ === 'koule') kresliKouli(p);
+  }
+  if (boss) kresliBoss(boss);
+  kresliDucha();
+  kresliPoleOci();
+  if (honic){ stinLetu(honic.x, honic.y, 19, .55); kresliHonice(honic); }
+  if (kostlivec){ stinLetu(kostlivec.x, kostlivec.y, 15, .7); kresliKostlivce(kostlivec); }
+  if (kamarad){ stinLetu(kamarad.x, kamarad.y, 15, .7); kresliKamarada(kamarad); }
+  if (stav === 'hra' || stav === 'padam')            // stín slepice na zemi
+    stinLetu(hrac.x, hrac.y, maly > 0 ? 11 : 18, 1);
+  if (dvojce > 0 && (stav === 'hra' || stav === 'padam')){
+    const dy = hrac.y + DVOJCE_ODSTUP * gravSmer;
+    stinLetu(hrac.x, dy, 16, .8);
+    ctx.save();
+    ctx.setLineDash([6, 7]); ctx.strokeStyle = 'rgba(255,143,177,.55)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hrac.x, hrac.y); ctx.lineTo(hrac.x, dy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = .9;
+    kresliSlepici(1, hrac.x, dy, true);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+  kresliSlepici();
+  kresliCaryRychlosti();
+  kresliDest(dt);
+  efektyKresli();
+  ctx.restore();
+
+  // jemné ztmavení rohů, ať to má hloubku
+  const v = ctx.createRadialGradient(Š/2, V/2, V*.38, Š/2, V/2, V*.98);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(.6, 'rgba(0,0,0,.14)');
+  v.addColorStop(1, 'rgba(0,0,0,.42)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, Š, V);
+
+  if (zablesk > 0){
+    ctx.fillStyle = 'rgba(255,255,255,' + Math.min(.5, zablesk) + ')';
+    ctx.fillRect(0, 0, Š, V);
+  }
+  kresliDash();
+  kresliHUD();
+  if (stav === 'menu' || stav === 'konec'){
+    prekryv();
+    if (stav === 'menu') kresliSlepici(1.7, Š/2, 96 + Math.sin(hodiny*2)*10);
+  }
+}
+
+// ============ SMYČKA ============
+let posledni = performance.now();
+function smycka(t){
+  const dt = Math.max(0, Math.min((t - posledni) / 1000, .05));
+  posledni = t;
+  hodiny += (stav === 'hra' ? 0 : dt);        // v menu ať se taky hýbe
+  if (stav === 'hra') krok(dt);
+  else if (stav === 'padam') padamKrok(dt);
+  else if (stav === 'konec') titulkyPosun += dt * 42;
+  else {
+    hrac.y = 250 + Math.sin(t/450) * 18;
+    hrac.mavF = Math.max(0, hrac.mavF - dt * 3.2);
+    if (hrac.mavF <= 0 && Math.random() < dt * 1.6) hrac.mavF = 1;   // slepice si mává
+  }
+  efektyKrok(dt);
+  kresli(dt);
+  requestAnimationFrame(smycka);
+}
+requestAnimationFrame(smycka);
+</script>
+</body>
+</html>

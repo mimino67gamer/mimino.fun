@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chcete být Bambilionářem? — kvíz pro děti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stage:#2B1055;
+  --stage-deep:#1B0838;
+  --stage-glow:#5B2A9E;
+  --gold:#FFC93C;
+  --gold-deep:#C97F10;
+  --coral:#FF5C6E;
+  --coral-deep:#C22C43;
+  --mint:#35D9A0;
+  --mint-deep:#128C63;
+  --cream:#FFF3DC;
+  --ink:#2A1348;
+  --sky:#4FC3F7;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Baloo 2','Nunito','Trebuchet MS','Segoe UI',sans-serif;
+  font-weight:600;
+  color:var(--cream);
+  background:var(--stage-deep);
+  min-height:100vh;
+  -webkit-text-size-adjust:100%;
+}
+.stage{
+  min-height:100vh;
+  padding:14px 14px 34px;
+  background:
+    radial-gradient(120% 70% at 50% -10%, var(--stage-glow) 0%, var(--stage) 45%, var(--stage-deep) 100%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.wrap{width:100%;max-width:620px}
+
+/* ---------- horní lišta ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.brand{font-size:16px;font-weight:800;letter-spacing:.02em;color:var(--gold);display:flex;align-items:center;gap:7px}
+.brand span{font-size:20px}
+.iconbtn{
+  border:3px solid var(--ink);border-radius:14px;background:var(--cream);color:var(--ink);
+  font:inherit;font-size:18px;font-weight:800;padding:4px 11px;cursor:pointer;
+  box-shadow:0 4px 0 var(--ink);
+}
+.iconbtn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+
+/* ---------- tlačítka ---------- */
+.big{
+  display:block;width:100%;font:inherit;font-size:24px;font-weight:800;cursor:pointer;
+  padding:16px 18px;border-radius:20px;border:4px solid var(--ink);
+  background:var(--gold);color:var(--ink);box-shadow:0 7px 0 var(--gold-deep);
+}
+.big:active{transform:translateY(5px);box-shadow:0 2px 0 var(--gold-deep)}
+.ghost{
+  font:inherit;font-size:17px;font-weight:700;cursor:pointer;padding:11px 16px;
+  border-radius:16px;border:3px dashed rgba(255,243,220,.5);background:transparent;color:var(--cream);
+}
+.ghost:hover{border-style:solid;background:rgba(255,243,220,.1)}
+:focus-visible{outline:4px solid var(--sky);outline-offset:3px}
+
+/* ---------- úvod ---------- */
+.hero{text-align:center;padding:18px 0 6px}
+.hero h1{
+  margin:0;line-height:.94;font-weight:800;
+  font-size:clamp(44px,15vw,86px);
+  color:var(--gold);
+  text-shadow:0 5px 0 var(--gold-deep), 0 11px 26px rgba(0,0,0,.45);
+}
+.hero h1 em{display:block;font-style:normal;font-size:.44em;color:var(--cream);text-shadow:0 4px 0 rgba(0,0,0,.35)}
+.coins{font-size:40px;letter-spacing:6px;margin:14px 0 6px}
+.hero p{font-size:18px;margin:6px auto 20px;max-width:36ch;color:#E7D9FF}
+.rules{
+  list-style:none;margin:0 0 22px;padding:16px 18px;text-align:left;
+  background:rgba(0,0,0,.24);border:3px solid rgba(255,201,60,.35);border-radius:22px;
+}
+.rules li{display:flex;gap:11px;align-items:flex-start;font-size:16.5px;padding:5px 0;color:#F3E9FF}
+.rules b{color:var(--gold)}
+
+/* ---------- žebřík výher ---------- */
+.ladder{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 10px;scrollbar-width:none}
+.ladder::-webkit-scrollbar{display:none}
+.rung{
+  flex:0 0 auto;text-align:center;padding:6px 11px;border-radius:13px;
+  font-size:12.5px;font-weight:700;color:#C9B6EE;background:rgba(0,0,0,.25);
+  border:2px solid transparent;white-space:nowrap;
+}
+.rung.safe{color:#FFE7A8;border-color:rgba(255,201,60,.45)}
+.rung.done{background:var(--mint-deep);color:#EAFFF7;border-color:var(--mint)}
+.rung.now{background:var(--gold);color:var(--ink);border-color:#fff;transform:scale(1.09);box-shadow:0 4px 14px rgba(255,201,60,.55)}
+
+/* ---------- nápovědy ---------- */
+.helps{display:flex;gap:9px;margin:12px 0 14px}
+.help{
+  flex:1;font:inherit;cursor:pointer;padding:9px 4px 7px;border-radius:16px;
+  border:3px solid var(--ink);background:var(--cream);color:var(--ink);
+  box-shadow:0 5px 0 var(--ink);line-height:1.1;
+}
+.help .ico{display:block;font-size:23px}
+.help .lbl{display:block;font-size:12.5px;font-weight:700}
+.help:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.help:disabled{opacity:.34;cursor:not-allowed;box-shadow:0 5px 0 var(--ink)}
+
+/* ---------- otázka ---------- */
+.qhead{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:#CDBBF0;margin-bottom:7px}
+.chip{background:rgba(255,201,60,.18);border:2px solid rgba(255,201,60,.5);color:#FFE7A8;padding:2px 11px;border-radius:999px;font-size:13px;font-weight:700}
+.card{
+  background:linear-gradient(180deg,#FFFDF7,#FFF3DC);color:var(--ink);
+  border:4px solid var(--ink);border-radius:24px;padding:18px 17px;
+  box-shadow:0 8px 0 rgba(0,0,0,.35);
+  font-size:22px;line-height:1.25;text-align:center;font-weight:700;
+  min-height:96px;display:flex;align-items:center;justify-content:center;
+}
+.answers{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
+@media(min-width:520px){.answers{grid-template-columns:1fr 1fr}}
+.ans{
+  display:flex;align-items:center;gap:11px;text-align:left;font:inherit;font-size:19px;font-weight:700;
+  cursor:pointer;padding:13px 14px;border-radius:18px;border:4px solid var(--ink);
+  background:#F5ECFF;color:var(--ink);box-shadow:0 6px 0 rgba(0,0,0,.35);width:100%;
+}
+.ans .key{
+  flex:0 0 auto;width:33px;height:33px;border-radius:11px;background:var(--stage);color:var(--gold);
+  display:grid;place-items:center;font-size:18px;font-weight:800;
+}
+.ans:active:not(:disabled){transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.ans:disabled{cursor:default}
+.ans.gone{opacity:.2}
+.ans.picked{background:var(--gold);animation:pulse .5s ease-in-out infinite alternate}
+.ans.right{background:var(--mint);box-shadow:0 6px 0 var(--mint-deep)}
+.ans.wrong{background:var(--coral);color:#fff;box-shadow:0 6px 0 var(--coral-deep)}
+.ans.right .key,.ans.wrong .key{background:rgba(0,0,0,.3);color:#fff}
+@keyframes pulse{to{filter:brightness(1.18)}}
+
+/* ---------- panel nápovědy ---------- */
+.panel{
+  margin-top:13px;padding:13px 15px;border-radius:18px;
+  background:rgba(0,0,0,.3);border:3px solid rgba(79,195,247,.5);font-size:16.5px;
+}
+.panel h3{margin:0 0 9px;font-size:15px;color:var(--sky);font-weight:800}
+.bars{display:flex;gap:9px;align-items:flex-end;height:96px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%}
+.bar i{display:block;width:100%;background:linear-gradient(180deg,var(--sky),#2A7FB8);border-radius:8px 8px 3px 3px;font-style:normal}
+.bar b{font-size:13px;color:#DDEEFF}
+.bar u{text-decoration:none;font-size:13px;color:#9FC7E8}
+
+/* ---------- výsledek ---------- */
+.result{text-align:center;padding:12px 0}
+.result .face{font-size:74px;line-height:1}
+.result h2{font-size:34px;margin:8px 0 2px;color:var(--gold);text-shadow:0 4px 0 var(--gold-deep)}
+.money{
+  display:inline-block;margin:10px 0 4px;padding:10px 22px;border-radius:18px;
+  background:var(--cream);color:var(--ink);border:4px solid var(--ink);
+  font-size:30px;font-weight:800;box-shadow:0 6px 0 var(--gold-deep);
+}
+.result p{font-size:18px;color:#EADFFF;max-width:34ch;margin:12px auto 20px}
+.hidden{display:none}
+.center{text-align:center}
+.foot{margin-top:14px;text-align:center}
+.confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:9}
+.confetti i{position:absolute;width:11px;height:15px;border-radius:3px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(106vh) rotate(720deg)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- výběr tématu ---------- */
+.pick{font-size:20px;font-weight:800;margin:2px 0 10px;color:var(--cream);text-align:center}
+.themes{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px}
+.theme{
+  display:flex;align-items:center;gap:9px;font:inherit;font-size:15.5px;font-weight:700;
+  text-align:left;cursor:pointer;padding:11px 11px;border-radius:17px;
+  border:3px solid var(--ink);background:#F5ECFF;color:var(--ink);box-shadow:0 5px 0 rgba(0,0,0,.35);
+}
+.theme em{font-style:normal;font-size:22px;line-height:1}
+.theme small{display:block;font-size:12px;font-weight:600;opacity:.65}
+.theme[aria-pressed="true"]{background:var(--gold);border-color:#fff;box-shadow:0 5px 0 var(--gold-deep)}
+.theme:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.themetag{
+  display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  color:#FFE7A8;background:rgba(255,201,60,.16);border:2px solid rgba(255,201,60,.4);
+  padding:2px 10px;border-radius:999px;
+}
+</style>
+</head>
+<body>
+<div class="stage">
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span>💰</span>Chcete být Bambilionářem?</div>
+    <button class="iconbtn" id="sound" aria-label="Zvuk zapnutý">🔊</button>
+  </div>
+
+  <!-- ÚVOD -->
+  <section id="screen-start">
+    <div class="hero">
+      <h1>Bambilionář<em>kvíz pro chytré hlavy</em></h1>
+      <div class="coins" aria-hidden="true">🪙 🪙 🪙</div>
+      <p>Deset otázek, které pořádně zaberou. Tři nápovědy a na konci celý bambilion.</p>
+    </div>
+    <ul class="rules">
+      <li>🎯 <span>Otázky jdou postupně nahoru — poslední tři jsou pro fajnšmekry.</span></li>
+      <li>🛟 <span>Po <b>milionu</b> a po <b>trilionu</b> máš jistotu — o to už nepřijdeš.</span></li>
+      <li>🧠 <span>Nápovědu můžeš použít <b>jen jednou za hru</b>.</span></li>
+      <li>🤚 <span>Kdykoli můžeš skončit a odnést si peníze domů.</span></li>
+    </ul>
+    <h2 class="pick">Vyber si téma</h2>
+    <div class="themes" id="themes"></div>
+    <button class="big" id="start">Začít hru</button>
+  </section>
+
+  <!-- HRA -->
+  <section id="screen-game" class="hidden">
+    <div class="ladder" id="ladder" aria-label="Žebřík výher"></div>
+
+    <div class="helps">
+      <button class="help" id="h5050"><span class="ico">✂️</span><span class="lbl">Půlka pryč</span></button>
+      <button class="help" id="hpub"><span class="ico">🙋</span><span class="lbl">Zeptat se dětí</span></button>
+      <button class="help" id="hcall"><span class="ico">📞</span><span class="lbl">Zavolat babičce</span></button>
+    </div>
+
+    <div class="qhead" style="flex-wrap:wrap;gap:6px">
+      <span id="qnum">Otázka 1 z 10</span>
+      <span class="themetag" id="themetag">🎲 Všechno dohromady</span>
+      <span class="chip" id="qcat">Zvířata</span>
+    </div>
+
+    <div class="card" id="question">…</div>
+    <div class="answers" id="answers"></div>
+    <div class="panel hidden" id="panel"></div>
+
+    <div class="foot">
+      <button class="ghost" id="quit">Skončit a vzít si výhru</button>
+    </div>
+  </section>
+
+  <!-- KONEC -->
+  <section id="screen-end" class="hidden">
+    <div class="result">
+      <div class="face" id="face">🎉</div>
+      <h2 id="endtitle">Gratulujeme!</h2>
+      <div class="money" id="endmoney">bambilion korun</div>
+      <p id="endtext"></p>
+      <button class="big" id="again">Hrát znovu</button>
+      <div style="margin-top:12px"><button class="ghost" id="rethemebtn">Vybrat jiné téma</button></div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<script>
+/* ============ OTÁZKY ============ */
+/* První odpověď je vždy správná — pořadí se před zobrazením zamíchá. */
+const POOL = {
+  lehke: [
+    ["Počítání","Kolik je 7 × 8?",["56","54","48","64"]],
+    ["Počítání","Kolik je 48 + 25?",["73","63","83","72"]],
+    ["Počítání","Kolik je 100 − 37?",["63","67","73","57"]],
+    ["Počítání","Kolik je 6 × 7?",["42","36","48","54"]],
+    ["Počítání","Kolik je 9 × 6?",["54","45","56","63"]],
+    ["Počítání","Kolik je 45 + 38?",["83","73","93","85"]],
+    ["Počítání","Kolik je 90 − 24?",["66","76","64","56"]],
+    ["Počítání","Kolik je 56 : 7?",["8","7","9","6"]],
+    ["Počítání","Kolik je 72 : 8?",["9","8","7","12"]],
+    ["Počítání","Kolik je polovina z 86?",["43","46","42","38"]],
+    ["Počítání","Kolik je dvojnásobek čísla 45?",["90","80","95","85"]],
+    ["Počítání","Kolik je 5 × 11?",["55","50","65","45"]],
+    ["Počítání","Kolik je 120 − 45?",["75","85","65","80"]],
+    ["Počítání","Kolik je 4 × 25?",["100","90","75","125"]],
+    ["Počítání","Kolik desítek se vejde do stovky?",["10","100","20","5"]],
+    ["Počítání","Kolik je 1000 − 250?",["750","850","650","700"]],
+    ["Počítání","Kolik minut jsou tři čtvrtě hodiny?",["45","40","30","50"]],
+    ["Počítání","Kolik je 12 + 19 + 9?",["40","38","42","44"]],
+    ["Počítání","Kolik centimetrů má jeden metr?",["100","10","1000","50"]],
+    ["Počítání","Kolik gramů má půl kila?",["500","50","5000","250"]],
+    ["Zvířata","Kolik nohou má pavouk?",["8","6","10","4"]],
+    ["Zvířata","Které z těchto zvířat je obojživelník?",["Žába","Ještěrka","Netopýr","Užovka"]],
+    ["Zvířata","Jak se jmenuje mládě ovce?",["Jehně","Kotě","Sele","Kůzle"]],
+    ["Zvířata","Jak se jmenuje mládě prasete?",["Sele","Hříbě","Tele","Kolouch"]],
+    ["Zvířata","Jak se jmenuje mládě jelena?",["Kolouch","Sele","Štěně","Jehně"]],
+    ["Zvířata","Jak se jmenuje mládě žáby?",["Pulec","Larva","Kukla","Housenka"]],
+    ["Zvířata","Jak se říká skupině vlků?",["Smečka","Hejno","Stádo","Roj"]],
+    ["Zvířata","Které zvíře je největší savec na světě?",["Plejtvák obrovský","Slon africký","Nosorožec","Žralok bílý"]],
+    ["Zvířata","Kolik nohou má mravenec?",["6","8","4","10"]],
+    ["Zvířata","Které zvíře nosí mládě ve vaku na břiše?",["Klokan","Lenochod","Mýval","Tapír"]],
+    ["Zvířata","Jak se jmenuje domeček, ve kterém včelaři chovají včely?",["Úl","Kurník","Bouda","Hnízdo"]],
+    ["Zvířata","Co staví bobr přes potok?",["Hráz","Most","Kurník","Plot"]],
+    ["Zvířata","Které zvíře nosí na zádech krunýř?",["Želva","Ježek","Krtek","Bobr"]],
+    ["Zvířata","Které zvíře umí měnit barvu podle okolí?",["Chameleon","Krokodýl","Žirafa","Los"]],
+    ["Zvířata","Jak se jmenuje samec kachny?",["Kačer","Houser","Krocan","Kohout"]],
+    ["Zvířata","Čím se hlavně živí sova?",["Myšmi","Trávou","Semínky","Rybami"]],
+    ["Zvířata","Který pták je sice ptákem, ale neumí létat?",["Tučňák","Vlaštovka","Sýkora","Racek"]],
+    ["Zvířata","Který z těchto ptáků odlétá na zimu do teplých krajin?",["Vlaštovka","Sýkora","Vrabec","Straka"]],
+    ["Zvířata","Čím se živí panda velká?",["Bambusem","Rybami","Masem","Trávou"]],
+    ["Zvířata","Jak se jmenuje domeček, který nosí šnek na zádech?",["Ulita","Krunýř","Skořápka","Kokon"]],
+    ["Zvířata","Kolik hrbů má velbloud dvouhrbý?",["2","1","3","4"]],
+    ["Zvířata","Které zvíře má ze všech nejdelší krk?",["Žirafa","Velbloud","Pštros","Kůň"]],
+    ["Zvířata","Co dělá had, když mu je stará kůže malá?",["Svlékne ji","Sní ji","Umyje ji","Nafoukne ji"]],
+    ["Zvířata","Jak se jmenuje zvíře, které si staví hrad z hlíny a chodbiček pod zemí?",["Krtek","Veverka","Kuna","Datel"]],
+    ["Příroda","Které z těchto zvířat spí zimním spánkem?",["Ježek","Liška","Srnka","Vrabec"]],
+    ["Příroda","Na kterém stromě roste žalud?",["Na dubu","Na smrku","Na břízě","Na jabloni"]],
+    ["Příroda","Čím se živí housenka, než se z ní stane motýl?",["Listy","Medem","Hmyzem","Semínky"]],
+    ["Příroda","Která část rostliny nasává vodu ze země?",["Kořen","Květ","List","Plod"]],
+    ["Příroda","Z čeho se nejčastěji vyrábí papír?",["Ze dřeva","Z písku","Z vlny","Z kamení"]],
+    ["Příroda","Jak se jmenují ledové kuličky, které někdy padají při bouřce?",["Kroupy","Rampouchy","Jinovatka","Mlha"]],
+    ["Příroda","Co se objeví na obloze, když sluneční paprsky projdou kapkami deště?",["Duha","Blesk","Mlha","Kometa"]],
+    ["Příroda","Ve kterém ročním období stromy shazují listí?",["Na podzim","Na jaře","V létě","V zimě"]],
+    ["Příroda","Jak se jmenuje jedovatá houba s červeným kloboukem a bílými tečkami?",["Muchomůrka červená","Hřib smrkový","Křemenáč","Liška obecná"]],
+    ["Příroda","Z čeho včely vyrábějí med?",["Z nektaru květů","Z listí","Z vody","Z pylu stromů"]],
+    ["Příroda","Kolik hlavních světových stran rozeznáváme?",["4","2","6","8"]],
+    ["Příroda","Na které straně obzoru ráno vychází Slunce?",["Na východě","Na západě","Na severu","Na jihu"]],
+    ["Příroda","Jak se jmenuje jehličnatý strom, kterému na podzim opadá jehličí?",["Modřín","Smrk","Borovice","Jedle"]],
+    ["Příroda","Co potřebuje oheň, aby mohl hořet?",["Vzduch","Led","Písek","Tmu"]],
+    ["Příroda","Jak se jmenuje velký kus ledu, který pluje po moři?",["Kra","Duna","Pěna","Vlna"]],
+    ["Tělo","Který orgán rozvádí krev po celém těle?",["Srdce","Plíce","Žaludek","Játra"]],
+    ["Tělo","Kolik plic má člověk?",["2","1","3","4"]],
+    ["Tělo","Kolik mléčných zubů má malé dítě?",["20","32","16","24"]],
+    ["Tělo","Ve kterém orgánu se tráví jídlo, hned jak ho spolkneme?",["V žaludku","V plicích","V srdci","V mozku"]],
+    ["Tělo","Která kost chrání lidský mozek?",["Lebka","Žebro","Páteř","Klíční kost"]],
+    ["Tělo","Které kosti chrání srdce a plíce?",["Žebra","Kotníky","Zápěstí","Lopatky"]],
+    ["Tělo","Kterým smyslem poznáš, že je něco sladké?",["Chutí","Zrakem","Sluchem","Hmatem"]],
+    ["Čas","Kolik týdnů má rok?",["52","48","60","36"]],
+    ["Čas","Který měsíc je nejkratší?",["Únor","Leden","Duben","Listopad"]],
+    ["Čas","Kolik dní má přestupný rok?",["366","365","364","370"]],
+    ["Čas","Kolik dní má obyčejný rok?",["365","360","366","352"]],
+    ["Čas","Který měsíc následuje hned po srpnu?",["Září","Červenec","Říjen","Listopad"]],
+    ["Čas","Kolik sekund mají dvě minuty?",["120","100","60","240"]],
+    ["Čas","Jak se říká období sta let?",["Století","Tisíciletí","Desetiletí","Éra"]],
+    ["Čas","Kolikátý měsíc v roce je červenec?",["Sedmý","Šestý","Osmý","Pátý"]],
+    ["Zeměpis","Jak se jmenuje nejdelší řeka v Česku?",["Vltava","Labe","Morava","Ohře"]],
+    ["Zeměpis","Jak se jmenuje nejvyšší hora Česka?",["Sněžka","Praděd","Lysá hora","Radhošť"]],
+    ["Zeměpis","Jaké je hlavní město Rakouska?",["Vídeň","Bratislava","Budapešť","Curych"]],
+    ["Zeměpis","Jaké je hlavní město Polska?",["Varšava","Krakov","Gdaňsk","Vratislav"]],
+    ["Zeměpis","Jaké je hlavní město Německa?",["Berlín","Mnichov","Hamburk","Drážďany"]],
+    ["Zeměpis","Jaké je hlavní město Itálie?",["Řím","Milán","Benátky","Neapol"]],
+    ["Zeměpis","Který stát sousedí s Českem na východě?",["Slovensko","Polsko","Rakousko","Německo"]],
+    ["Zeměpis","Kolik sousedních států má Česko?",["4","3","5","6"]],
+    ["Zeměpis","Jak se jmenuje největší město na Moravě?",["Brno","Olomouc","Zlín","Ostrava"]],
+    ["Zeměpis","Ve kterém městě stojí Eiffelova věž?",["V Paříži","V Londýně","V Římě","V Madridu"]],
+    ["Zeměpis","K jakému moři jezdí Češi na dovolenou do Chorvatska?",["K Jaderskému","K Baltskému","K Černému","K Severnímu"]],
+    ["Zeměpis","Jak se jmenuje pohoří na severu Česka, kde stojí Sněžka?",["Krkonoše","Šumava","Beskydy","Jeseníky"]],
+    ["Zeměpis","K čemu slouží kompas?",["Ukazuje sever","Měří teplotu","Měří čas","Váží věci"]],
+    ["Vesmír","Která planeta je nejblíž ke Slunci?",["Merkur","Mars","Země","Saturn"]],
+    ["Vesmír","Co obíhá kolem Země?",["Měsíc","Slunce","Mars","Venuše"]],
+    ["Vesmír","Kolik měsíců obíhá kolem Země?",["1","2","4","0"]],
+    ["Vesmír","Které planetě se říká rudá planeta?",["Marsu","Venuši","Jupiteru","Neptunu"]],
+    ["Vesmír","Jak se říká lidem, kteří létají do vesmíru?",["Kosmonauti","Piloti","Geologové","Astrologové"]],
+    ["Hudba","Kolik strun má obyčejná kytara?",["6","4","8","12"]],
+    ["Hudba","Jak se jmenuje velký nástroj s černými a bílými klávesami?",["Klavír","Housle","Bubny","Flétna"]],
+    ["Sport","Kolik hráčů má na hřišti jeden fotbalový tým?",["11","9","13","7"]],
+    ["Sport","Ve kterém sportu se hraje s pukem?",["V hokeji","V basketbalu","V tenise","Ve volejbalu"]],
+    ["Povolání","Jak se jmenuje lékař, který léčí zvířata?",["Veterinář","Zubař","Lékárník","Zahradník"]],
+    ["Povolání","Co dělá archeolog?",["Vykopává staré věci","Léčí lidi","Staví domy","Peče chleba"]],
+    ["Povolání","Kdo řídí velkou loď?",["Kapitán","Strojvedoucí","Pilot","Kormidelník lyží"]]
+  ],
+  stredni: [
+    ["Počítání","Kolik je 12 × 12?",["144","124","132","148"]],
+    ["Počítání","Kolik je 144 : 12?",["12","14","11","24"]],
+    ["Počítání","Kolik je 9 × 9?",["81","72","89","99"]],
+    ["Počítání","Kolik je 11 × 12?",["132","122","144","112"]],
+    ["Počítání","Kolik je 250 + 375?",["625","615","575","725"]],
+    ["Počítání","Kolik je 1000 − 444?",["556","566","456","644"]],
+    ["Počítání","Kolik je čtvrtina ze sta?",["25","20","40","50"]],
+    ["Počítání","Kolik jsou tři čtvrtiny z 80?",["60","40","70","75"]],
+    ["Počítání","Kolik je 8 × 25?",["200","250","160","225"]],
+    ["Počítání","Kolik minut má půl dne?",["720","600","480","1200"]],
+    ["Počítání","Kolik hodin má týden?",["168","148","144","180"]],
+    ["Počítání","Kolik je 13 × 3?",["39","36","43","33"]],
+    ["Počítání","Kolik je 96 : 8?",["12","11","14","8"]],
+    ["Počítání","Kolik je sedm krát sedm?",["49","42","56","47"]],
+    ["Tvary a míry","Kolik hran má krychle?",["12","8","6","16"]],
+    ["Tvary a míry","Kolik vrcholů má krychle?",["8","6","12","4"]],
+    ["Tvary a míry","Kolik stěn má krychle?",["6","8","12","4"]],
+    ["Tvary a míry","Kolik stupňů má pravý úhel?",["90","180","45","360"]],
+    ["Tvary a míry","Kolik stupňů mají dohromady všechny úhly v trojúhelníku?",["180","90","360","270"]],
+    ["Tvary a míry","Jak se jmenuje trojúhelník, který má všechny strany stejně dlouhé?",["Rovnostranný","Pravoúhlý","Tupoúhlý","Rovnoramenný"]],
+    ["Tvary a míry","Kolik milimetrů má jeden centimetr?",["10","100","5","1000"]],
+    ["Tvary a míry","Kolik metrů má jeden kilometr?",["1000","100","10 000","500"]],
+    ["Tvary a míry","Kolik gramů má jeden kilogram?",["1000","100","500","10 000"]],
+    ["Tvary a míry","Kolik mililitrů má půl litru?",["500","50","1000","250"]],
+    ["Tvary a míry","Kolik stran má osmiúhelník?",["8","6","10","7"]],
+    ["Tvary a míry","Jak se jmenuje těleso, které má tvar míče?",["Koule","Válec","Kužel","Krychle"]],
+    ["Vesmír","Která planeta má nápadné prstence?",["Saturn","Venuše","Mars","Merkur"]],
+    ["Vesmír","Která planeta sluneční soustavy je největší?",["Jupiter","Saturn","Neptun","Země"]],
+    ["Vesmír","Jak dlouho trvá, než Země jednou oběhne Slunce?",["Rok","Měsíc","Den","Týden"]],
+    ["Vesmír","Kolik planet obíhá kolem našeho Slunce?",["8","9","7","12"]],
+    ["Vesmír","Jak se jmenuje síla, která nás drží na zemi?",["Gravitace","Magnetismus","Tření","Elektřina"]],
+    ["Vesmír","Co je Slunce?",["Hvězda","Planeta","Kometa","Měsíc"]],
+    ["Vesmír","Proč se na Zemi střídá den a noc?",["Země se otáčí kolem své osy","Slunce zhasíná","Měsíc zakrývá Slunce","Země letí pryč"]],
+    ["Vesmír","Jak se jmenuje kámen z vesmíru, který dopadne na Zemi?",["Meteorit","Kometa","Planetka","Asteroid v pásu"]],
+    ["Vesmír","Kdo jako první stanul na Měsíci?",["Neil Armstrong","Jurij Gagarin","Vladimír Remek","Michael Collins"]],
+    ["Vesmír","Který Čech letěl jako první do vesmíru?",["Vladimír Remek","Jan Janský","Otto Wichterle","Josef Ressel"]],
+    ["Zeměpis","Kolik světadílů má naše Země?",["7","5","9","4"]],
+    ["Zeměpis","Který oceán je největší?",["Tichý","Atlantský","Indický","Severní ledový"]],
+    ["Zeměpis","Jaké je hlavní město Slovenska?",["Bratislava","Košice","Lublaň","Krakov"]],
+    ["Zeměpis","Jak se jmenuje nejvyšší hora světa?",["Mount Everest","Mont Blanc","Kilimandžáro","Matterhorn"]],
+    ["Zeměpis","Která horká poušť je na světě největší?",["Sahara","Gobi","Kalahari","Atacama"]],
+    ["Zeměpis","Jak se jmenuje nejdelší řeka v Africe?",["Nil","Kongo","Zambezi","Niger"]],
+    ["Zeměpis","Jak se jmenuje velká řeka, která protéká jihoamerickým pralesem?",["Amazonka","Mississippi","Dunaj","Ganga"]],
+    ["Zeměpis","Jaké je hlavní město Velké Británie?",["Londýn","Dublin","Edinburgh","Liverpool"]],
+    ["Zeměpis","Ve kterém světadílu leží Egypt?",["V Africe","V Asii","V Evropě","V Austrálii"]],
+    ["Zeměpis","Který světadíl je nejchladnější?",["Antarktida","Evropa","Asie","Severní Amerika"]],
+    ["Zeměpis","Který světadíl je nejmenší?",["Austrálie","Evropa","Antarktida","Afrika"]],
+    ["Zeměpis","Jak se jmenuje nejvyšší hora Alp?",["Mont Blanc","Sněžka","Zugspitze","Grossglockner"]],
+    ["Zeměpis","Jaké je hlavní město Japonska?",["Tokio","Kjóto","Ósaka","Peking"]],
+    ["Zeměpis","Jaké je hlavní město Spojených států amerických?",["Washington","New York","Los Angeles","Chicago"]],
+    ["Příroda","Který plyn ze vzduchu potřebujeme k dýchání?",["Kyslík","Dusík","Helium","Vodík"]],
+    ["Příroda","Jak se jmenuje děj, kterým si rostliny vyrábějí potravu ze slunce?",["Fotosyntéza","Fermentace","Filtrace","Fotografie"]],
+    ["Příroda","Při kolika stupních Celsia se voda začne vařit?",["Při 100","Při 50","Při 200","Při 0"]],
+    ["Příroda","Kolik váží jeden litr vody?",["1 kilogram","10 kilogramů","100 gramů","1 tuna"]],
+    ["Příroda","Kolik skupenství může mít voda?",["3","2","4","1"]],
+    ["Příroda","Jaké skupenství má vodní pára?",["Plynné","Pevné","Kapalné","Sypké"]],
+    ["Příroda","Co magnet přitahuje?",["Železo","Dřevo","Sklo","Papír"]],
+    ["Příroda","Jak se jmenuje nauka o počasí?",["Meteorologie","Geologie","Biologie","Astronomie"]],
+    ["Příroda","Jaký plyn potřebují rostliny při fotosyntéze nasát ze vzduchu?",["Oxid uhličitý","Kyslík","Helium","Dusík"]],
+    ["Příroda","Jak se jmenuje přístroj, kterým se dívají vědci na velmi malé věci?",["Mikroskop","Dalekohled","Kompas","Barometr"]],
+    ["Příroda","Jak se jmenuje přístroj, kterým pozorujeme hvězdy?",["Dalekohled","Mikroskop","Teploměr","Periskop"]],
+    ["Příroda","Jak se jmenují nejmenší částečky, ze kterých je složeno všechno kolem nás?",["Atomy","Kapky","Zrnka","Buňky"]],
+    ["Zvířata","Které zvíře běhá po souši nejrychleji?",["Gepard","Kůň","Klokan","Pštros"]],
+    ["Zvířata","Který savec umí opravdu létat?",["Netopýr","Veverka","Tučňák","Krtek"]],
+    ["Zvířata","Jak se říká zvířatům, která se živí jen rostlinami?",["Býložravci","Masožravci","Všežravci","Hlodavci"]],
+    ["Zvířata","Do jaké skupiny zvířat patří krokodýl?",["Mezi plazy","Mezi obojživelníky","Mezi savce","Mezi ryby"]],
+    ["Zvířata","Čím dýchají ryby pod vodou?",["Žábrami","Plícemi","Kůží","Ploutvemi"]],
+    ["Zvířata","Který pták snáší největší vejce?",["Pštros","Orel","Labuť","Pelikán"]],
+    ["Zvířata","Jak se odborně říká proměně, při které se z pulce stane žába?",["Metamorfóza","Fotosyntéza","Migrace","Regenerace"]],
+    ["Zvířata","Jak se jmenuje největší žralok na světě?",["Žralok obrovský","Žralok bílý","Žralok tygří","Kladivoun"]],
+    ["Zvířata","Které z těchto zvířat se dožívá nejvyššího věku?",["Želva obrovská","Myš","Králík","Veverka"]],
+    ["Zvířata","Jak se jmenuje skupina zvířat, která krmí mláďata mlékem?",["Savci","Plazi","Ptáci","Ryby"]],
+    ["Tělo","Kolik kostí má tělo dospělého člověka?",["206","150","320","98"]],
+    ["Tělo","Který orgán řídí celé tělo a přemýšlí?",["Mozek","Srdce","Plíce","Ledviny"]],
+    ["Tělo","Z kolika oddílů se skládá lidské srdce?",["4","2","3","6"]],
+    ["Tělo","Který orgán je největší v lidském těle?",["Kůže","Játra","Plíce","Srdce"]],
+    ["Tělo","Co v krvi rozváží kyslík po těle?",["Červené krvinky","Bílé krvinky","Sliny","Voda"]],
+    ["Tělo","Jak se jmenuje nejdelší kost v lidském těle?",["Stehenní","Pažní","Klíční","Holenní"]],
+    ["Tělo","Kolik základních smyslů má člověk?",["5","3","7","4"]],
+    ["Tělo","Jak se jmenuje trubice, kterou putuje jídlo z pusy do žaludku?",["Jícen","Průdušnice","Tepna","Střevo"]],
+    ["Tělo","Který orgán čistí krev od odpadu?",["Ledviny","Plíce","Srdce","Mozek"]],
+    ["Česko","Kdo nakreslil Krtečka?",["Zdeněk Miler","Josef Lada","Ondřej Sekora","Jiří Trnka"]],
+    ["Česko","Kdo napsal knihu o Ferdovi Mravencovi?",["Ondřej Sekora","Zdeněk Miler","Karel Čapek","Božena Němcová"]],
+    ["Česko","Jak se jmenuje největší hrad v Česku?",["Pražský hrad","Karlštejn","Křivoklát","Bouzov"]],
+    ["Česko","Kdo napsal knihu Babička?",["Božena Němcová","Karel Čapek","Jan Neruda","Eliška Krásnohorská"]],
+    ["Česko","Kdo vymyslel loupežníka Rumcajse?",["Václav Čtvrtek","Zdeněk Miler","Josef Čapek","Miloš Macourek"]],
+    ["Česko","Jaké tři barvy má česká vlajka?",["Bílá, červená, modrá","Bílá, zelená, modrá","Červená, žlutá, modrá","Bílá, červená, černá"]],
+    ["Česko","Jak se jmenuje česká státní hymna?",["Kde domov můj","Nad Tatrou sa blýska","Vltava","Ktož jsú boží bojovníci"]],
+    ["Česko","Kdo byl první prezident Československa?",["T. G. Masaryk","Edvard Beneš","Václav Havel","Karel IV."]],
+    ["Česko","Který hrad nechal postavit Karel IV. pro uložení korunovačních klenotů?",["Karlštejn","Křivoklát","Konopiště","Špilberk"]],
+    ["Česko","Jak se jmenoval společný stát Čechů a Slováků?",["Československo","Velkomoravská říše","Rakousko-Uhersko","Česká říše"]],
+    ["Česko","Kdo byl Jan Ámos Komenský?",["Učitel a myslitel","Malíř","Král","Mořeplavec"]],
+    ["Umění","Jaká barva vznikne smícháním modré a žluté?",["Zelená","Fialová","Oranžová","Hnědá"]],
+    ["Umění","Jaká barva vznikne smícháním červené a modré?",["Fialová","Zelená","Oranžová","Šedá"]],
+    ["Umění","Kdo složil skladbu Vltava?",["Bedřich Smetana","Antonín Dvořák","Leoš Janáček","W. A. Mozart"]],
+    ["Jazyk","Jak se jmenuje slovní druh, který označuje činnost?",["Sloveso","Podstatné jméno","Přídavné jméno","Předložka"]],
+    ["Jazyk","Jak se jmenuje slovní druh, kterým pojmenováváme věci a osoby?",["Podstatné jméno","Sloveso","Příslovce","Spojka"]],
+    ["Jazyk","Kolik pádů má čeština?",["7","4","6","10"]],
+    ["Sport","Jak často se konají letní olympijské hry?",["Každé čtyři roky","Každý rok","Každé dva roky","Každých deset let"]],
+    ["Sport","Kolik hráčů má na hřišti basketbalový tým?",["5","6","7","4"]]
+  ],
+  tezke: [
+    ["Počítání","Kolik je 15 × 6?",["90","80","96","85"]],
+    ["Počítání","Kolik nul se píše v čísle milion?",["6","3","9","12"]],
+    ["Počítání","Kolik nul se píše v čísle miliarda?",["9","6","12","8"]],
+    ["Počítání","Kolik je 25 × 12?",["300","250","320","275"]],
+    ["Počítání","Kolik je 17 × 4?",["68","64","72","78"]],
+    ["Počítání","Kolik je 2 × 2 × 2 × 2 × 2?",["32","16","64","10"]],
+    ["Počítání","Kolik je osmina ze 64?",["8","16","6","4"]],
+    ["Počítání","Kolik sekund má jedna hodina?",["3600","600","1800","7200"]],
+    ["Počítání","Kolik je 13 × 13?",["169","159","196","149"]],
+    ["Počítání","Kolik je 144 + 256?",["400","390","410","420"]],
+    ["Počítání","Jak se říká číslu, které se dá dělit jen jedničkou a samo sebou?",["Prvočíslo","Sudé číslo","Desetinné číslo","Záporné číslo"]],
+    ["Počítání","Kolik prvočísel je mezi 1 a 10?",["4","3","5","2"]],
+    ["Vesmír","Jak se jmenuje galaxie, ve které žijeme?",["Mléčná dráha","Andromeda","Velký vůz","Kasiopeja"]],
+    ["Vesmír","Kdo byl první člověk ve vesmíru?",["Jurij Gagarin","Neil Armstrong","Vladimír Remek","Buzz Aldrin"]],
+    ["Vesmír","Která planeta je nejdál od Slunce?",["Neptun","Uran","Saturn","Pluto"]],
+    ["Vesmír","Která planeta je nejteplejší?",["Venuše","Merkur","Mars","Jupiter"]],
+    ["Vesmír","Jak dlouho letí světlo ze Slunce na Zemi?",["Asi 8 minut","Asi 8 sekund","Asi 8 hodin","Asi 8 dní"]],
+    ["Vesmír","Jak se jmenovala první umělá družice Země?",["Sputnik","Apollo","Vostok","Hubble"]],
+    ["Vesmír","Jak dlouho trvá jeden oběh Měsíce kolem Země?",["Asi 28 dní","Asi 7 dní","Asi 365 dní","Asi 100 dní"]],
+    ["Vesmír","Z čeho jsou složené Saturnovy prstence?",["Z ledu a kamení","Z plynu","Ze zlata","Z písku"]],
+    ["Vesmír","Co způsobuje na Zemi příliv a odliv?",["Přitažlivost Měsíce","Vítr","Sopky","Proudy lodí"]],
+    ["Vesmír","Jak se jmenuje slavný kosmický dalekohled na oběžné dráze?",["Hubbleův","Newtonův","Galileův","Keplerův kompas"]],
+    ["Vesmír","Jak se jmenuje nejbližší hvězda po Slunci?",["Proxima Centauri","Polárka","Sírius","Vega"]],
+    ["Zeměpis","Které moře je tak slané, že se v něm nepotopíš?",["Mrtvé moře","Černé moře","Baltské moře","Jaderské moře"]],
+    ["Zeměpis","Který stát má na světě největší rozlohu?",["Rusko","Kanada","Čína","Austrálie"]],
+    ["Zeměpis","Jak se jmenuje největší ostrov světa?",["Grónsko","Madagaskar","Island","Nová Guinea"]],
+    ["Zeměpis","Jak se jmenuje nejhlubší místo v oceánu?",["Mariánský příkop","Bermudský trojúhelník","Rudé moře","Suezský průplav"]],
+    ["Zeměpis","Která sopka zasypala starověké město Pompeje?",["Vesuv","Etna","Fudži","Krakatoa"]],
+    ["Zeměpis","Ve které zemi stojí velké pyramidy v Gíze?",["V Egyptě","V Řecku","V Mexiku","V Iráku"]],
+    ["Zeměpis","Jak se jmenuje pohoří na hranici Evropy a Asie?",["Ural","Alpy","Himálaj","Karpaty"]],
+    ["Zeměpis","Ve které zemi leží starobylé město Machu Picchu?",["V Peru","V Brazílii","V Mexiku","V Chile"]],
+    ["Zeměpis","Jak se jmenuje největší deštný prales světa?",["Amazonský","Konžský","Sibiřská tajga","Bornejský"]],
+    ["Zeměpis","Který stát světa má nejvíc obyvatel?",["Indie","Čína","USA","Rusko"]],
+    ["Zeměpis","Jak se jmenuje nejmenší stát světa?",["Vatikán","Monako","San Marino","Lichtenštejnsko"]],
+    ["Zeměpis","Jak se jmenuje nejhlubší jezero světa?",["Bajkal","Balaton","Ženevské jezero","Viktoriino jezero"]],
+    ["Zeměpis","Jak se jmenuje nejdelší pohoří světa?",["Andy","Alpy","Himálaj","Skalnaté hory"]],
+    ["Zeměpis","Kolik obyvatel má přibližně Česko?",["Asi 10 milionů","Asi 1 milion","Asi 50 milionů","Asi 100 milionů"]],
+    ["Dějiny","Který český král nechal postavit Karlův most?",["Karel IV.","Rudolf II.","Přemysl Otakar II.","Václav IV."]],
+    ["Dějiny","Kdo vynalezl žárovku, která svítila dlouho?",["Thomas Edison","Isaac Newton","Albert Einstein","Alexander Bell"]],
+    ["Dějiny","Kdo v roce 1492 připlul do Ameriky?",["Kryštof Kolumbus","Marco Polo","James Cook","Ferdinand Magellan"]],
+    ["Dějiny","Kdo postavil pyramidy v Gíze?",["Staří Egypťané","Staří Řekové","Vikingové","Římané"]],
+    ["Dějiny","Ve kterém roce vzniklo samostatné Československo?",["1918","1848","1945","1993"]],
+    ["Dějiny","Kdo vynalezl knihtisk?",["Johannes Gutenberg","Leonardo da Vinci","Karel IV.","Galileo Galilei"]],
+    ["Dějiny","Kdo byl Tutanchamon?",["Egyptský faraon","Řecký bůh","Římský císař","Anglický král"]],
+    ["Dějiny","Jak se jmenovala slavná loď, která se v roce 1912 potopila po srážce s ledovcem?",["Titanic","Santa Maria","Mayflower","Victoria"]],
+    ["Dějiny","Kdo byl Jan Hus?",["Kazatel a učenec","Král","Malíř","Hudebník"]],
+    ["Dějiny","Jak se jmenuje nejstarší univerzita v Česku?",["Univerzita Karlova","Masarykova univerzita","Univerzita Palackého","Technika v Brně"]],
+    ["Věda","Který vědec přišel s teorií relativity?",["Albert Einstein","Isaac Newton","Galileo Galilei","Nikola Tesla"]],
+    ["Věda","Jak se jmenuje nejtvrdší nerost na světě?",["Diamant","Žula","Křemen","Mramor"]],
+    ["Věda","Jak se odborně říká kuchyňské soli?",["Chlorid sodný","Uhličitan vápenatý","Kyselina citronová","Oxid uhličitý"]],
+    ["Věda","Který kov je při běžné teplotě tekutý?",["Rtuť","Železo","Hliník","Měď"]],
+    ["Věda","Jaký plyn vydechujeme z plic ven?",["Oxid uhličitý","Kyslík","Helium","Vodík"]],
+    ["Věda","Kdo objevil penicilin?",["Alexander Fleming","Louis Pasteur","Marie Curie","Gregor Mendel"]],
+    ["Věda","Co je nejrychlejší ve vesmíru?",["Světlo","Zvuk","Raketa","Vítr"]],
+    ["Věda","Jak se jmenuje síla, která brzdí předmět klouzající po povrchu?",["Tření","Gravitace","Magnetismus","Tlak"]],
+    ["Věda","Jak se jmenuje věda o živých organismech?",["Biologie","Geologie","Fyzika","Astronomie"]],
+    ["Věda","Kdo sestavil periodickou tabulku prvků?",["Dmitrij Mendělejev","Albert Einstein","Isaac Newton","Antoine Lavoisier"]],
+    ["Věda","Jakou značku má v chemii zlato?",["Au","Zl","Go","Ag"]],
+    ["Věda","Při kolika stupních Celsia voda zamrzá?",["Při 0","Při 10","Při −10","Při 100"]],
+    ["Věda","Jak se jmenuje energie, kterou získáváme ze slunečních paprsků pomocí panelů?",["Sluneční","Větrná","Vodní","Jaderná"]],
+    ["Věda","Co měří jednotka zvaná watt?",["Výkon","Teplotu","Délku","Hmotnost"]],
+    ["Tělo","Kolik zubů má dospělý člověk?",["32","28","24","36"]],
+    ["Tělo","Jak se jmenuje nejmenší kost v lidském těle?",["Třmínek","Kladívko","Kostrč","Klíční kost"]],
+    ["Tělo","Jak se jmenuje sval, který nám pomáhá dýchat?",["Bránice","Biceps","Srdce","Tricepsy"]],
+    ["Tělo","Kolik litrů krve má přibližně dospělý člověk?",["Asi 5","Asi 1","Asi 20","Asi 50"]],
+    ["Tělo","Jak se jmenuje černý kroužek uprostřed oka, který propouští světlo?",["Zornice","Duhovka","Rohovka","Bělmo"]],
+    ["Tělo","Jak se jmenuje tvrdá bílá vrstva, která chrání zuby?",["Sklovina","Dřeň","Kůra","Blána"]],
+    ["Zvířata","Kolik srdcí má chobotnice?",["3","1","2","5"]],
+    ["Zvířata","Jak se jmenuje největší kočkovitá šelma?",["Tygr","Lev","Levhart","Puma"]],
+    ["Zvířata","Který savec snáší vejce?",["Ptakopysk","Lenochod","Vydra","Bobr"]],
+    ["Zvířata","Který pták umí létat i pozpátku?",["Kolibřík","Vrabec","Orel","Kachna"]],
+    ["Zvířata","Jak se jmenuje největší suchozemská šelma?",["Lední medvěd","Tygr","Lev","Vlk"]],
+    ["Zvířata","Které zvíře dokáže znovu narůst ztracenou nohu?",["Mlok","Zajíc","Ježek","Holub"]],
+    ["Zvířata","Jak se jmenuje vědec, který se zabývá hmyzem?",["Entomolog","Ornitolog","Geolog","Botanik"]],
+    ["Zvířata","Které zvíře má jazyk delší než vlastní tělo?",["Chameleon","Krokodýl","Pes","Slon"]],
+    ["Zvířata","Kolik hodin denně prospí koala?",["Asi 20","Asi 5","Asi 10","Asi 2"]],
+    ["Zvířata","Jak se jmenuje skupina ryb plujících pohromadě?",["Hejno","Smečka","Stádo","Roj"]],
+    ["Jazyk","Jak se jmenuje první písmeno řecké abecedy?",["Alfa","Omega","Beta","Delta"]],
+    ["Jazyk","Jak se jmenuje poslední písmeno řecké abecedy?",["Omega","Alfa","Sigma","Gama"]],
+    ["Jazyk","Jak se jmenovalo obrázkové písmo starých Egypťanů?",["Hieroglyfy","Klínové písmo","Runy","Latinka"]],
+    ["Jazyk","Jakým jazykem se mluví v Brazílii?",["Portugalsky","Španělsky","Brazilsky","Francouzsky"]],
+    ["Umění","Kdo namaloval obraz Mona Lisa?",["Leonardo da Vinci","Vincent van Gogh","Pablo Picasso","Claude Monet"]],
+    ["Umění","Kdo složil symfonii Z nového světa?",["Antonín Dvořák","Bedřich Smetana","Ludwig van Beethoven","Leoš Janáček"]],
+    ["Umění","Kdo napsal knihy o Harrym Potterovi?",["J. K. Rowlingová","Astrid Lindgrenová","Roald Dahl","C. S. Lewis"]],
+    ["Umění","Který český malíř je slavný svými secesními plakáty?",["Alfons Mucha","Josef Lada","Mikoláš Aleš","Jan Zrzavý"]],
+    ["Česko","Který český vynálezce vymyslel lodní šroub?",["Josef Ressel","Jan Janský","František Křižík","Otto Wichterle"]],
+    ["Česko","Kdo vynalezl měkké kontaktní čočky?",["Otto Wichterle","Josef Ressel","Jaroslav Heyrovský","Jan Evangelista Purkyně"]],
+    ["Česko","Kdo rozdělil lidskou krev na čtyři krevní skupiny?",["Jan Janský","Otto Wichterle","František Křižík","Josef Ressel"]],
+    ["Česko","Který mnich zkoumal dědičnost na hrachu a stal se otcem genetiky?",["Gregor Mendel","Jan Hus","Bohuslav Balbín","Jan Ámos Komenský"]],
+    ["Česko","Jak vysoká je přibližně Sněžka?",["1603 metrů","1000 metrů","2500 metrů","803 metrů"]],
+    ["Česko","Ve kterém městě stojí hrad Špilberk?",["V Brně","V Praze","V Olomouci","V Plzni"]],
+    ["Česko","Ve kterém století žil Karel IV.?",["Ve 14.","V 10.","V 17.","V 19."]]
+  ]
+};
+
+const EXTRA = {
+  minecraft: {
+    lehke: [
+      ["Minecraft","Jak se jmenuje zelené monstrum, které syčí a vybuchne?",["Creeper","Zombie","Skeleton","Slime"]],
+      ["Minecraft","Z kolika prken se vyrábí pracovní stůl?",["Ze 4","Ze 2","Z 6","Z 9"]],
+      ["Minecraft","Co musíš postavit a použít, abys přeskočil noc?",["Postel","Truhlu","Pec","Dveře"]],
+      ["Minecraft","Jaký nástroj potřebuješ, abys vytěžil kámen?",["Krumpáč","Lopatu","Sekeru","Motyku"]],
+      ["Minecraft","Jak se jmenuje výchozí postava hráče?",["Steve","Notch","Herobrine","Villager"]],
+      ["Minecraft","Které zvíře si ochočíš kostí?",["Vlka","Krávu","Prase","Ovci"]],
+      ["Minecraft","Kolik srdíček života má hráč na začátku?",["10","20","5","8"]],
+      ["Minecraft","Co potřebuješ k výrobě pochodně?",["Klacek a uhlí","Kámen a vodu","Písek a hlínu","Železo a dřevo"]],
+      ["Minecraft","Jak se jmenuje režim, ve kterém máš všechno a můžeš létat?",["Kreativní","Přežití","Hardcore","Divácký"]],
+      ["Minecraft","Co získáš, když ostříháš ovci nůžkami?",["Vlnu","Kůži","Peří","Provaz"]],
+      ["Minecraft","Co snáší slepice?",["Vejce","Mléko","Med","Semínka"]],
+      ["Minecraft","Kdy se na povrchu objevují zombie a kostlivci?",["V noci","V poledne","Za deště","Nikdy"]]
+    ],
+    stredni: [
+      ["Minecraft","Z jakého bloku se staví portál do Netheru?",["Z obsidiánu","Z kamene","Ze skla","Z železa"]],
+      ["Minecraft","Čím portál do Netheru zapálíš?",["Křesadlem","Loučí","Lávou","Uhlím"]],
+      ["Minecraft","Kde v podzemí najdeš diamanty?",["Hluboko u dna světa","Hned pod trávou","V oblacích","V řece"]],
+      ["Minecraft","Jaký krumpáč nejméně potřebuješ na těžbu diamantů?",["Železný","Dřevěný","Kamenný","Zlatý"]],
+      ["Minecraft","Čím se platí při obchodování s vesničany?",["Smaragdy","Diamanty","Zlatem","Uhlím"]],
+      ["Minecraft","Jak se jmenuje vysoký černý mob, který se teleportuje?",["Enderman","Creeper","Wither Skeleton","Blaze"]],
+      ["Minecraft","Kolik pšenice potřebuješ na jeden chléb?",["3","1","5","9"]],
+      ["Minecraft","Jak se jmenuje dimenze plná lávy a ohně?",["Nether","End","Overworld","Aether"]],
+      ["Minecraft","Kdo žije v Netheru a obchoduje za zlato?",["Piglini","Vesničané","Endermani","Axolotli"]],
+      ["Minecraft","K čemu slouží kouzelnický stůl?",["Vylepšuje výbavu","Vaří jídlo","Taví rudu","Ukládá věci"]],
+      ["Minecraft","Co se stane, když se potká proud vody s lávou?",["Vznikne kámen nebo obsidián","Nic","Vybuchne to","Vznikne zlato"]],
+      ["Minecraft","Z čeho se vyrábí TNT?",["Ze střelného prachu a písku","Z uhlí a dřeva","Z železa a lávy","Z redstonu a hlíny"]]
+    ],
+    tezke: [
+      ["Minecraft","Jak se jmenuje závěrečný boss hry?",["Ender Dragon","Wither","Warden","Ravager"]],
+      ["Minecraft","Ve které dimenzi Ender Dragon žije?",["V Endu","V Netheru","V Overworldu","V jeskyni"]],
+      ["Minecraft","Z jaké suroviny se vyrábí netherit?",["Z prastarých úlomků","Z uhlí","Z obsidiánu","Ze smaragdů"]],
+      ["Minecraft","Který materiál na výbavu je pevnější než diamant?",["Netherit","Zlato","Železo","Měď"]],
+      ["Minecraft","Co musíš házet, abys našel pevnost s portálem do Endu?",["Enderovo oko","Sněhovou kouli","Vejce","Perlu z ledu"]],
+      ["Minecraft","Kdo Minecraft původně naprogramoval?",["Markus Persson","Robert Topala","Bill Gates","Satoshi Tajiri"]],
+      ["Minecraft","Kolik lebek potřebuješ, abys přivolal Withera?",["3","1","4","7"]],
+      ["Minecraft","Co získáš po poražení Withera?",["Netherskou hvězdu","Diamant","Elytru","Trojzubec"]],
+      ["Minecraft","K čemu slouží maják?",["Dává hráči vylepšení","Zabíjí moby","Otevírá portál","Svítí jen na ozdobu"]],
+      ["Minecraft","Kolik diamantů potřebuješ na diamantový krumpáč?",["3","2","5","1"]],
+      ["Minecraft","Co se stane s creeperem, do kterého uhodí blesk?",["Stane se nabitým creeperem","Zmizí","Zkrotne","Změní se v zombie"]],
+      ["Minecraft","Jak se jmenuje svítící žlutý blok z Netheru?",["Glowstone","Netherrack","Magma","Soul sand"]]
+    ]
+  },
+  pokemon: {
+    lehke: [
+      ["Pokémon","Jakého typu je Pikachu?",["Elektrického","Vodního","Ohnivého","Travního"]],
+      ["Pokémon","Do čeho trenéři chytají pokémony?",["Do pokéballu","Do síťky","Do klece","Do batohu"]],
+      ["Pokémon","Jakého typu je Charmander?",["Ohnivého","Vodního","Kamenného","Létavého"]],
+      ["Pokémon","Jakého typu je Squirtle?",["Vodního","Ohnivého","Elektrického","Ledového"]],
+      ["Pokémon","Jak se jmenuje hlavní hrdina pokémoního seriálu?",["Ash","Brock","Gary","Red Hat"]],
+      ["Pokémon","Kolik pokémonů může mít trenér s sebou v týmu?",["6","3","10","1"]],
+      ["Pokémon","Jak se jmenuje přístroj, který ukazuje informace o pokémonech?",["Pokédex","Pokéball","Pokénav","Pokéhodinky"]],
+      ["Pokémon","Ze které země Pokémon pochází?",["Z Japonska","Z Ameriky","Z Anglie","Z Koreje"]],
+      ["Pokémon","Jak se jmenuje profesor, který v Kantu rozdává první pokémony?",["Profesor Oak","Profesor Elm","Profesor Rowan","Profesor Sycamore"]],
+      ["Pokémon","Jaký pokémon je velký, modrý a pořád spí?",["Snorlax","Jigglypuff","Psyduck","Gengar"]]
+    ],
+    stredni: [
+      ["Pokémon","Na koho se vyvine Charmander?",["Na Charmeleona","Na Charizarda","Na Flareona","Na Magmara"]],
+      ["Pokémon","Na koho se vyvine Charmeleon?",["Na Charizarda","Na Charmandera","Na Dragonita","Na Arcanina"]],
+      ["Pokémon","Na koho se vyvine Squirtle?",["Na Wartortla","Na Blastoise","Na Poliwaga","Na Lapras"]],
+      ["Pokémon","Který pokémon má mnoho různých vývojů, třeba Vaporeon a Jolteon?",["Eevee","Ditto","Abra","Zubat"]],
+      ["Pokémon","Jak se jmenuje zlá organizace z první generace?",["Tým Raketa","Tým Magma","Tým Aqua","Tým Galaxie"]],
+      ["Pokémon","Který pokémon Týmu Raketa umí mluvit lidskou řečí?",["Meowth","Wobbuffet","Arbok","Koffing"]],
+      ["Pokémon","Kolik pokémonů bylo v úplně první generaci?",["151","251","100","386"]],
+      ["Pokémon","Který typ útoků je silný proti vodním pokémonům?",["Elektrický","Ohnivý","Kamenný","Létavý"]],
+      ["Pokémon","Proti kterému typu jsou travní pokémoni slabí?",["Proti ohnivému","Proti vodnímu","Proti zemnímu","Proti kamennému"]],
+      ["Pokémon","Jak se jmenuje region z první generace her?",["Kanto","Johto","Hoenn","Sinnoh"]],
+      ["Pokémon","Jaký typ je Bulbasaur kromě travního?",["Jedový","Létavý","Vodní","Psychický"]],
+      ["Pokémon","Co pokémon většinou potřebuje, aby se vyvinul?",["Nasbírat zkušenosti","Vyspat se","Sníst bobuli","Vyhrát závod"]]
+    ],
+    tezke: [
+      ["Pokémon","Který pokémon byl uměle vytvořen z genů pokémona Mew?",["Mewtwo","Ditto","Porygon","Mewthree"]],
+      ["Pokémon","Který pokémon má v Pokédexu číslo 1?",["Bulbasaur","Pikachu","Charmander","Mew"]],
+      ["Pokémon","Jaké číslo má v Pokédexu Pikachu?",["25","1","10","151"]],
+      ["Pokémon","Který z těchto pokémonů patří mezi legendární ptáky Kanta?",["Articuno","Pidgeot","Fearow","Farfetch'd"]],
+      ["Pokémon","Jakého hlavního typu je Gengar?",["Duchového","Temného","Psychického","Jedového letce"]],
+      ["Pokémon","Na jaký typ vůbec nefungují normální útoky?",["Na duchový","Na ocelový","Na vílí","Na dračí"]],
+      ["Pokémon","Na koho se vyvine Eevee, když použiješ vodní kámen?",["Na Vaporeona","Na Jolteona","Na Flareona","Na Umbreona"]],
+      ["Pokémon","Kdo Pokémony vymyslel?",["Satoshi Tajiri","Shigeru Miyamoto","Markus Persson","Robert Topala"]],
+      ["Pokémon","Jakého typu je Dragonite kromě dračího?",["Létavého","Vodního","Ocelového","Zemního"]],
+      ["Pokémon","Který pokémon umí napodobit vzhled jiného pokémona?",["Ditto","Abra","Clefairy","Machop"]]
+    ]
+  },
+  gd: {
+    lehke: [
+      ["Geometry Dash","Jak se jmenuje úplně první level hry?",["Stereo Madness","Back On Track","Polargeist","Dry Out"]],
+      ["Geometry Dash","Jaký tvar má základní ikona hráče?",["Kostka","Koule","Trojúhelník","Hvězda"]],
+      ["Geometry Dash","Co se stane, když narazíš do překážky?",["Level začíná znovu","Ztratíš jeden život","Vrátíš se o kousek","Nic"]],
+      ["Geometry Dash","Jak hráč postavu ovládá?",["Klepnutím, kterým skáče","Šipkami do stran","Kreslením čáry","Nakláněním"]],
+      ["Geometry Dash","Podle čeho jsou překážky v levelech rozmístěné?",["Podle rytmu hudby","Podle náhody","Podle počasí","Podle skóre"]],
+      ["Geometry Dash","Jak se jmenuje druhý hlavní level?",["Back On Track","Polargeist","Jumper","Cycles"]],
+      ["Geometry Dash","Co dělá žlutý skákací pad?",["Vymrští hráče nahoru","Zpomalí hru","Zabije hráče","Otočí obraz"]]
+    ],
+    stredni: [
+      ["Geometry Dash","Jak se jmenuje režim, ve kterém si můžeš dávat kontrolní body?",["Practice mode","Creator mode","Easy mode","Demo mode"]],
+      ["Geometry Dash","Jaká je nejtěžší obtížnost levelů?",["Demon","Insane","Harder","Expert"]],
+      ["Geometry Dash","Jak se jmenuje forma, ve které hráč letí jako raketa?",["Ship","Ball","Wave","Robot"]],
+      ["Geometry Dash","Jak se jmenuje forma, která se kutálí a mění gravitaci?",["Ball","Ship","Spider","Cube"]],
+      ["Geometry Dash","Co kromě dokončení levelu můžeš v levelu sbírat?",["Tajné mince","Zbraně","Životy","Klíče od dveří"]],
+      ["Geometry Dash","Kolik tajných mincí bývá schovaných v hlavním levelu?",["3","1","5","10"]],
+      ["Geometry Dash","Jak se jmenuje třetí hlavní level?",["Polargeist","Dry Out","Base After Base","Time Machine"]],
+      ["Geometry Dash","K čemu slouží procenta na horní liště?",["Ukazují, kolik levelu jsi ušel","Ukazují hlasitost","Ukazují baterii","Ukazují rychlost"]]
+    ],
+    tezke: [
+      ["Geometry Dash","Kdo je autorem hry Geometry Dash?",["Robert Topala","Markus Persson","Satoshi Tajiri","Toby Fox"]],
+      ["Geometry Dash","Ve kterém roce hra poprvé vyšla?",["2013","2010","2016","2019"]],
+      ["Geometry Dash","Jak se jmenuje forma, která létá po vlnovce?",["Wave","Ball","Ufo","Robot"]],
+      ["Geometry Dash","Jak se jmenuje forma pavouka, která se teleportuje ke stropu?",["Spider","Wave","Ship","Cube"]],
+      ["Geometry Dash","Jak se jmenuje 21. hlavní level hry?",["Fingerdash","Deadlocked","Clubstep","Hexagon Force"]],
+      ["Geometry Dash","Který z těchto hlavních levelů má obtížnost Demon?",["Clubstep","Jumper","Dry Out","Polargeist"]],
+      ["Geometry Dash","Jak se jmenuje část hry, kde si hráči tvoří vlastní levely?",["Editor levelů","Obchod","Sklad ikon","Tabulka skóre"]],
+      ["Geometry Dash","Co musíš udělat, abys odemkl nové ikony?",["Nasbírat hvězdy a odměny","Zaplatit životy","Vyhrát závod","Počkat den"]]
+    ]
+  },
+  pocitace: {
+    lehke: [
+      ["Informatika","Jak se jmenuje část počítače, na které vidíš obraz?",["Monitor","Myš","Klávesnice","Reproduktor"]],
+      ["Informatika","K čemu slouží počítačová myš?",["K ovládání kurzoru","K psaní textu","K tisku","K nabíjení"]],
+      ["Informatika","Co dělá klávesa Backspace?",["Maže znak vlevo","Uloží soubor","Vypne počítač","Zvýší hlasitost"]],
+      ["Informatika","K čemu slouží tiskárna?",["K tisku na papír","K hraní zvuku","K nabíjení telefonu","K měření času"]],
+      ["Informatika","Co je internet?",["Celosvětová síť počítačů","Jeden velký počítač","Druh telefonu","Program na kreslení"]],
+      ["Informatika","Jak se jmenuje program, ve kterém prohlížíš webové stránky?",["Prohlížeč","Kalkulačka","Editor","Antivirus"]],
+      ["Informatika","Co znamená ikonka diskety v programech?",["Uložit","Smazat","Tisknout","Zavřít"]],
+      ["Informatika","Kam se v počítači přesunou smazané soubory?",["Do koše","Do složky Dokumenty","Na plochu","Na internet"]],
+      ["Informatika","K čemu slouží heslo?",["Aby se k účtu nedostal cizí člověk","Ke zrychlení počítače","K tisku","K nastavení jasu"]],
+      ["Informatika","Co dělá klávesa Enter?",["Potvrdí nebo odřádkuje","Maže text","Vypne obrazovku","Přepíná jazyk"]]
+    ],
+    stredni: [
+      ["Informatika","Kolik bitů má jeden bajt?",["8","4","16","10"]],
+      ["Informatika","Co znamená zkratka WWW?",["World Wide Web","Wireless Web Work","World Web Window","Wide World Wire"]],
+      ["Informatika","V jakém jazyce se píší webové stránky?",["V HTML","V Excelu","V PDF","V MP3"]],
+      ["Informatika","Které části počítače se říká jeho mozek?",["Procesoru","Monitoru","Klávesnici","Reproduktoru"]],
+      ["Informatika","Jaký obsah má soubor s příponou .jpg?",["Obrázek","Zvuk","Video","Tabulku"]],
+      ["Informatika","Jaký obsah má soubor s příponou .mp3?",["Zvuk","Obrázek","Text","Program"]],
+      ["Informatika","Jak se jmenuje program, ve kterém děti programují barevné bloky?",["Scratch","Photoshop","Word","Chrome"]],
+      ["Informatika","Co udělá klávesová zkratka Ctrl+C?",["Zkopíruje označené","Vloží text","Vrátí krok zpět","Uloží soubor"]],
+      ["Informatika","Co udělá klávesová zkratka Ctrl+V?",["Vloží zkopírované","Vystřihne text","Vybere vše","Vytiskne stránku"]],
+      ["Informatika","Jak se říká škodlivému programu, který ničí data v počítači?",["Virus","Robot","Ovladač","Prohlížeč"]],
+      ["Informatika","K čemu slouží paměť RAM?",["K dočasné práci s daty","K trvalému uložení fotek","K tisku","K připojení k internetu"]],
+      ["Informatika","Co je robot?",["Stroj řízený programem","Druh počítačové hry","Elektrická zásuvka","Typ souboru"]]
+    ],
+    tezke: [
+      ["Informatika","V jaké číselné soustavě počítá počítač?",["Ve dvojkové","V desítkové","V osmičkové","V šestkové"]],
+      ["Informatika","Jak se ve dvojkové soustavě zapíše číslo 5?",["101","110","011","111"]],
+      ["Informatika","Kolik bajtů má jeden kilobajt?",["1024","100","10","512"]],
+      ["Informatika","Který programovací jazyk se jmenuje po hadovi?",["Python","Java","Ruby","Kotlin"]],
+      ["Informatika","Kdo je považována za první programátorku na světě?",["Ada Lovelace","Marie Curie","Grace Slick","Katherine Bell"]],
+      ["Informatika","Jak se říká přesnému postupu, podle kterého program úlohu vyřeší?",["Algoritmus","Diagram","Protokol","Kompilát"]],
+      ["Informatika","Jak se říká chybě v programu?",["Bug","Byte","Bit","Pixel"]],
+      ["Informatika","Kdo spoluzaložil firmu Microsoft?",["Bill Gates","Steve Jobs","Mark Zuckerberg","Alan Turing"]],
+      ["Informatika","Jaká je nejmenší jednotka informace?",["Bit","Bajt","Pixel","Hertz"]],
+      ["Informatika","Do které části počítače se data ukládají natrvalo?",["Na pevný disk","Do paměti RAM","Do procesoru","Do monitoru"]],
+      ["Informatika","K čemu slouží Wi-Fi?",["K bezdrátovému připojení k internetu","K nabíjení baterie","K tisku dokumentů","Ke zvětšení obrazovky"]],
+      ["Informatika","Jak se ve dvojkové soustavě zapíše číslo 8?",["1000","0100","1100","0011"]]
+    ]
+  },
+  vesmir: {
+    lehke: [
+      ["Vesmír","Jak se jmenuje hvězda, kolem které obíhá Země?",["Slunce","Polárka","Měsíc","Sírius"]],
+      ["Vesmír","Jak se jmenuje stroj, kterým lidé létají do vesmíru?",["Raketa","Ponorka","Vrtulník","Balón"]],
+      ["Vesmír","Co si musí kosmonaut obléknout před výstupem do vesmíru?",["Skafandr","Plavky","Přilbu na kolo","Pláštěnku"]],
+      ["Vesmír","Proč vidíme hvězdy jen jako malé tečky?",["Jsou strašně daleko","Jsou opravdu malé","Svítí slabě","Zakrývá je mrak"]],
+      ["Vesmír","Jak se jmenuje tvar, po kterém planety obíhají kolem Slunce?",["Dráha kolem Slunce","Rovná čára","Spirála dolů","Čtverec"]],
+      ["Vesmír","Co uvidíš na Měsíci na povrchu?",["Krátery","Lesy","Řeky","Města"]],
+      ["Vesmír","Jak se cítí kosmonaut na vesmírné stanici?",["Vznáší se ve stavu beztíže","Je pořád těžký","Nemůže se hýbat","Padá dolů"]]
+    ],
+    stredni: [
+      ["Vesmír","Jak se jmenuje mezinárodní vesmírná stanice, která obíhá kolem Země?",["ISS","NASA","Sputnik","Apollo"]],
+      ["Vesmír","Co je kometa?",["Ledové těleso s ohonem","Malá planeta","Druh hvězdy","Kus Měsíce"]],
+      ["Vesmír","Proč na Měsíci nejsou slyšet zvuky?",["Není tam vzduch","Je tam moc ticho","Je tam zima","Je moc daleko"]],
+      ["Vesmír","Jak se jmenuje pás mezi Marsem a Jupiterem plný kamenných těles?",["Pás planetek","Mléčná dráha","Prstenec","Kráterové pole"]],
+      ["Vesmír","Co se stane při zatmění Slunce?",["Měsíc zakryje Slunce","Slunce zhasne","Země se otočí","Zmizí hvězdy"]]
+    ],
+    tezke: [
+      ["Vesmír","Jak se jmenuje síla, kvůli které z černé díry neunikne ani světlo?",["Gravitace","Tření","Magnetismus","Tlak"]],
+      ["Vesmír","Která planeta se otáčí kolem své osy nejpomaleji?",["Venuše","Mars","Jupiter","Země"]],
+      ["Vesmír","Jak se jmenuje největší sopka ve sluneční soustavě, která leží na Marsu?",["Olympus Mons","Vesuv","Etna","Everest"]],
+      ["Vesmír","Jak se jmenuje jev, kdy Země vstoupí do stínu a Měsíc zčervená?",["Zatmění Měsíce","Zatmění Slunce","Polární záře","Meteorický roj"]],
+      ["Vesmír","Jak se jmenuje mise, při které lidé poprvé přistáli na Měsíci?",["Apollo 11","Sputnik 1","Vostok 1","Artemis 1"]]
+    ]
+  }
+};
+
+const EXTRA2 = {
+  minecraft: {
+    lehke: [
+      ["Minecraft","K čemu slouží pec?",["K tavení a pečení","K ukládání věcí","K obchodování","K plavbě"]],
+      ["Minecraft","Z čeho se vyrábějí prkna?",["Z kmenů dřeva","Z kamene","Z listí","Z písku"]],
+      ["Minecraft","Kolik prken dostaneš z jednoho kmene?",["4","2","6","9"]],
+      ["Minecraft","Jaký nástroj kope hlínu a písek nejrychleji?",["Lopata","Krumpáč","Sekera","Motyka"]],
+      ["Minecraft","Čím nejrychleji pokácíš strom?",["Sekerou","Lopatou","Motykou","Nůžkami"]],
+      ["Minecraft","K čemu slouží motyka?",["K obdělání půdy","K těžbě rudy","K boji","K rybaření"]],
+      ["Minecraft","Co musíš zasadit, abys mohl péct chleba?",["Pšenici","Mrkev","Květiny","Kaktus"]],
+      ["Minecraft","Za jakým jídlem půjde prase?",["Za mrkví","Za rybou","Za chlebem","Za kostí"]],
+      ["Minecraft","Z čeho se vyrábí šíp?",["Z klacku, pazourku a peří","Z železa a dřeva","Z kamene a nitě","Ze skla a písku"]],
+      ["Minecraft","Od kterého zvířete získáš peří?",["Od slepice","Od krávy","Od ovce","Od prasete"]],
+      ["Minecraft","Co ztlumí pád z velké výšky?",["Voda","Kámen","Sklo","Písek"]],
+      ["Minecraft","Kolik políček má rychlá lišta v inventáři?",["9","6","12","5"]],
+      ["Minecraft","Co se stane se zombie, když vyjde slunce?",["Začne hořet","Zmizí","Usne","Stane se vesničanem"]],
+      ["Minecraft","Co občas vypadne, když rozbiješ list stromu?",["Sazenice","Uhlí","Kámen","Železo"]],
+      ["Minecraft","Co vyroste ze zasazené sazenice?",["Strom","Květina","Tráva","Houba"]],
+      ["Minecraft","Jak se jmenuje zelený rosolovitý mob, který se při zabití dělí na menší?",["Slime","Creeper","Ghast","Zombie"]],
+      ["Minecraft","Čím chytáš ryby?",["Prutem","Sítí","Lopatou","Kbelíkem"]],
+      ["Minecraft","Kolik prken potřebuješ na truhlu?",["8","4","6","9"]],
+      ["Minecraft","K čemu slouží plot kolem výběhu?",["Aby zvířata neutekla","Aby lépe rostla tráva","Ke svícení","K obchodu"]],
+      ["Minecraft","Kdo bydlí ve vesnici?",["Vesničané","Endermani","Piglini","Skeletoni"]],
+      ["Minecraft","Co potřebuješ, abys mohl jezdit na koni?",["Sedlo","Uzdu z železa","Mrkev na prutu","Kompas"]],
+      ["Minecraft","Jak se jmenuje růžovo-hnědý vodní mob, kterého můžeš nosit v kbelíku?",["Axolotl","Delfín","Chobotnice","Želva"]],
+      ["Minecraft","Co se stane, když je hráč moc dlouho pod vodou?",["Začne se topit","Zrychlí se","Nic","Vidí lépe"]],
+      ["Minecraft","K čemu slouží žebřík?",["K lezení nahoru","K obraně","Ke svícení","K rybaření"]],
+      ["Minecraft","Co se stane, když na oheň nalijeme vodu?",["Uhasne","Zvětší se","Změní se v lávu","Nic"]],
+      ["Minecraft","Jak se jmenuje jídlo z upečeného hovězího masa?",["Steak","Chléb","Dort","Guláš"]],
+      ["Minecraft","Jaký nástroj potřebuješ na stříhání ovcí?",["Nůžky","Meč","Sekeru","Krumpáč"]],
+      ["Minecraft","Co dostaneš, když vydojíš krávu kbelíkem?",["Mléko","Vodu","Med","Lávu"]],
+      ["Minecraft","Který mob leze i po stěnách?",["Pavouk","Zombie","Vesničan","Prase"]],
+      ["Minecraft","Jaký blok potřebuješ, abys uvařil jídlo bez pece?",["Táborák","Truhlu","Stůl","Kotel"]],
+      ["Minecraft","Čím se dá zapálit oheň?",["Křesadlem","Uhlím","Loučí","Papírem"]],
+      ["Minecraft","Jakou barvu má diamantový blok?",["Světle modrou","Zelenou","Červenou","Žlutou"]],
+      ["Minecraft","Který blok můžeš rozbít i holou rukou?",["Hlínu","Obsidián","Železnou rudu","Diamantovou rudu"]],
+      ["Minecraft","K čemu potřebuješ luk?",["Ke střelbě šípy","K rybaření","K těžbě","K létání"]],
+      ["Minecraft","Jak se jmenuje mob s lukem, který v noci střílí?",["Skeleton","Slime","Vesničan","Kráva"]],
+      ["Minecraft","Co uděláš, aby zvířata měla mláďata?",["Nakrmíš je","Zavřeš je do truhly","Pojmenuješ je","Ochočíš je kostí"]],
+      ["Minecraft","Jaký blok se používá jako průhledné okno?",["Sklo","Led","Papír","Vlna"]],
+      ["Minecraft","Z čeho se sklo vyrábí?",["Z písku v peci","Z ledu","Z vody","Z křemene"]],
+      ["Minecraft","K čemu slouží kolejnice?",["Aby po nich jezdil vozík","Ke stavbě mostů","K výrobě nástrojů","Ke svícení"]],
+      ["Minecraft","Jaký nástroj potřebuješ na těžbu obsidiánu?",["Diamantový krumpáč","Železnou lopatu","Kamenný krumpáč","Zlatou sekeru"]],
+      ["Minecraft","Kolik hráčů může hrát na jednom serveru?",["Mnoho hráčů najednou","Jenom jeden","Přesně dva","Nejvýš čtyři"]],
+      ["Minecraft","Jak se jmenuje ženská výchozí postava hráče?",["Alex","Ellie","Zuzka","Mia"]],
+      ["Minecraft","Co ukazuje ukazatel s masem vedle srdíček?",["Jak moc máš hlad","Kolik máš zkušeností","Kolik máš brnění","Kolik je hodin"]],
+      ["Minecraft","Co se stane, když hráči dojde jídlo úplně?",["Začne ztrácet život","Usne","Zpomalí se navždy","Nic"]],
+      ["Minecraft","Jak se jmenuje mob, který v noci létá nad hráčem, který dlouho nespal?",["Fantom","Netopýr","Ghast","Papoušek"]],
+      ["Minecraft","Který blok se používá k výrobě betonu po smíchání s vodou?",["Betonový prášek","Hlína","Písek","Štěrk"]],
+      ["Minecraft","Jak se jmenuje jídlo, které si upečeš z pšenice a cukru?",["Dort","Kaše","Polévka","Chléb"]],
+      ["Minecraft","K čemu jsou dveře?",["Aby moby nemohly dovnitř","Ke svícení","K uložení věcí","K výrobě nástrojů"]]
+    ],
+    stredni: [
+      ["Minecraft","Kolik minut trvá celý herní den a noc?",["20","10","60","5"]],
+      ["Minecraft","Kam ukazuje obyčejný kompas?",["K místu, kde jsi začal","K nejbližšímu diamantu","Na sever mapy","K vesnici"]],
+      ["Minecraft","Kolik železných ingotů potřebuješ na kbelík?",["3","1","5","9"]],
+      ["Minecraft","Kolik železa potřebuješ na železný krumpáč?",["3","1","2","5"]],
+      ["Minecraft","Co dostaneš, když dáš železnou rudu do pece?",["Železný ingot","Uhlí","Kámen","Zlato"]],
+      ["Minecraft","Co udělá hozená enderperla?",["Teleportuje hráče","Vybuchne","Zapálí oheň","Vytvoří portál"]],
+      ["Minecraft","Který mob pouští enderperly?",["Enderman","Creeper","Skeleton","Zombie"]],
+      ["Minecraft","K čemu se používá redstone?",["K napájení mechanismů","K léčení","K výrobě brnění","K jídlu"]],
+      ["Minecraft","Co dělá píst?",["Posouvá bloky","Vytváří světlo","Vaří jídlo","Ukládá věci"]],
+      ["Minecraft","K čemu slouží nálevka?",["Přesouvá věci mezi truhlami","Nabíjí redstone","Filtruje vodu","Svítí"]],
+      ["Minecraft","Jak se jmenuje mob z netherské pevnosti, který střílí ohnivé koule?",["Blaze","Ghast","Piglin","Strider"]],
+      ["Minecraft","K čemu slouží varný stojan?",["K vaření lektvarů","K tavení rudy","K opravě věcí","K očarování"]],
+      ["Minecraft","Jak se jmenuje zombie, která žije pod vodou?",["Utopenec","Guardian","Axolotl","Drowned Skeleton"]],
+      ["Minecraft","Jak se jmenuje velká stavba na dně oceánu?",["Oceánský monument","Pevnost","Bastion","Ancient City"]],
+      ["Minecraft","Jak se jmenuje obrovská dřevěná budova v temném lese?",["Sídlo v lese","Vesnice","Chrám v džungli","Pevnost"]],
+      ["Minecraft","Jak se jmenují podzemní chodby s kolejemi a pavučinami?",["Opuštěný důl","Stronghold","Jeskynní vesnice","Bastion"]],
+      ["Minecraft","Ve které stavbě najdeš portál do Endu?",["V pevnosti pod zemí","V netherské pevnosti","V oceánském monumentu","Ve vesnici"]],
+      ["Minecraft","Z čeho vyrobíš Enderovo oko?",["Z enderperly a blaze prášku","Z diamantu a skla","Ze zlata a redstonu","Z obsidiánu a lapisu"]],
+      ["Minecraft","Ve kterém biomu rostou kaktusy?",["V poušti","V džungli","V tajze","V bažině"]],
+      ["Minecraft","Ve kterém biomu žijí pandy a rostou bambusy?",["V džungli","V poušti","V tundře","V savaně"]],
+      ["Minecraft","K čemu slouží kovadlina?",["K opravě a pojmenování věcí","K tavení rudy","K obchodování","K vaření"]],
+      ["Minecraft","Co udělá brusný kámen s očarovaným mečem?",["Sundá z něj očarování","Zdvojnásobí očarování","Opraví ho zadarmo","Změní ho na luk"]],
+      ["Minecraft","Jak se jmenuje očarování, které z jedné rudy vytěží víc surovin?",["Štěstí","Efektivita","Ostrost","Trvanlivost"]],
+      ["Minecraft","Které očarování ti dá celý blok, třeba led nebo sklo?",["Hedvábný dotek","Štěstí","Efektivita","Odraz"]],
+      ["Minecraft","Co potřebuješ vedle kouzelnického stolu, abys mohl očarovat?",["Lapis lazuli","Diamanty","Zlato","Uhlí"]],
+      ["Minecraft","Jakou barvu má lapis lazuli?",["Modrou","Zelenou","Červenou","Bílou"]],
+      ["Minecraft","Co dělá zlaté jablko?",["Doplní život a dá odolnost","Zabije moby okolo","Zrychlí těžbu","Vytvoří portál"]],
+      ["Minecraft","Co se stane s vesničanem, do kterého uhodí blesk?",["Změní se v čarodějnici","Zmizí","Zbohatne","Stane se z něj zombie"]],
+      ["Minecraft","Co dělá čarodějnice v souboji?",["Hází lektvary","Střílí šípy","Vybuchuje","Teleportuje se"]],
+      ["Minecraft","K čemu slouží elytra?",["K plachtění vzduchem","K rychlejšímu běhu","K dýchání pod vodou","K neviditelnosti"]],
+      ["Minecraft","Co potřebuješ, abys s elytrou vyletěl výš?",["Ohňostroj","Kbelík vody","Perlu","Sedlo"]],
+      ["Minecraft","Jak se jmenuje světle zelený mob, který v Netheru chodí po lávě?",["Strider","Blaze","Ghast","Magma Cube"]],
+      ["Minecraft","Jaký mob v Netheru pláče a střílí ohnivé koule?",["Ghast","Blaze","Piglin","Hoglin"]],
+      ["Minecraft","Co Piglini v Netheru chtějí, abys je nerozzlobil?",["Zlaté brnění","Diamanty","Chleba","Kytky"]],
+      ["Minecraft","Který blok v Netheru hoří donekonečna?",["Netherrack","Obsidián","Kámen","Písek"]],
+      ["Minecraft","Co dělá lektvar nočního vidění?",["Umožní vidět ve tmě","Zrychlí hráče","Dá dýchat pod vodou","Zvýší sílu"]],
+      ["Minecraft","Co dělá lektvar dýchání pod vodou?",["Prodlouží čas pod vodou","Umožní létat","Vyléčí hráče","Zrychlí plavání"]],
+      ["Minecraft","Z čeho se vaří lektvar pomalého pádu?",["Z fantomí blány","Ze sušené tresky","Z cukru","Z melounu"]],
+      ["Minecraft","Co dáš pod úl, aby tě včely při sbírání medu nenapadly?",["Táborák","Vodu","Sklo","Písek"]],
+      ["Minecraft","Kolik bloků wool potřebuješ na jednu postel?",["3","1","5","9"]],
+      ["Minecraft","Co ti řekne hodinový blok?",["Kolik je v herním světě hodin","Kde je spawn","Kolik máš zkušeností","Kde je nejbližší mob"]],
+      ["Minecraft","Který malý mob vylézá z kamenných bloků v pevnosti?",["Silverfish","Endermite","Slime","Bee"]],
+      ["Minecraft","Jak se jmenuje mapa, kterou si můžeš vyrobit a kreslí okolí?",["Mapa","Plán","Kompas","Atlas"]],
+      ["Minecraft","Jak zabráníš mobům, aby se objevovali u tvého domu?",["Rozsvítíš okolí","Postavíš plot","Zasadíš stromy","Nastavíš noc"]],
+      ["Minecraft","Co dělá blok Note Block?",["Hraje tóny","Svítí","Otevírá dveře","Vaří jídlo"]],
+      ["Minecraft","Jaké brnění je pevnější než železné, ale slabší než netheritové?",["Diamantové","Zlaté","Kožené","Řetězové"]]
+    ],
+    tezke: [
+      ["Minecraft","Podle čeho se Warden orientuje?",["Podle zvuku a vibrací","Podle zraku","Podle vůně","Podle světla"]],
+      ["Minecraft","Ve kterém biomu Warden žije?",["V hlubokém temném biomu","V džungli","V Netheru","V Endu"]],
+      ["Minecraft","Jak se jmenuje struktura v hlubokém temném biomu?",["Prastaré město","Bastion","Pevnost","Chrám"]],
+      ["Minecraft","Který blok vysílá signál, když uslyší zvuk?",["Sculk senzor","Pozorovatel","Opakovač","Komparátor"]],
+      ["Minecraft","Kde najdeš elytru?",["V lodi v End City","V pevnosti","V oceánském monumentu","U vesničanů"]],
+      ["Minecraft","Který mob pouští trojzubec?",["Utopenec","Guardian","Delfín","Strider"]],
+      ["Minecraft","Kolik bloků obsidiánu potřebuješ nejméně na portál do Netheru?",["10","14","6","20"]],
+      ["Minecraft","Kolik rámečků má portál do Endu?",["12","10","16","8"]],
+      ["Minecraft","Kolik bloků v Overworldu odpovídá jednomu bloku v Netheru?",["8","2","16","4"]],
+      ["Minecraft","Co dělá shulker box?",["Ukládá věci a dá se přenášet","Střílí","Svítí","Vaří lektvary"]],
+      ["Minecraft","Čím Ender Dragon během souboje doplňuje život?",["Endovými krystaly","Enderperlami","Obsidiánem","Draky menšími"]],
+      ["Minecraft","Kde najdeš Wither Skeletony?",["V netherské pevnosti","V Endu","V dole","V bažině"]],
+      ["Minecraft","Z čeho se přivolává Wither?",["Ze tří lebek a soul sandu","Ze čtyř diamantů","Z ohnivých tyčí","Z endových krystalů"]],
+      ["Minecraft","K čemu slouží Respawn Anchor?",["K oživení v Netheru","K teleportaci","K očarování","Ke svícení"]],
+      ["Minecraft","Co se stane, když si zkusíš lehnout do postele v Netheru?",["Vybuchne","Usneš","Nic","Přeskočí se den"]],
+      ["Minecraft","Co dělá pozorovatel (observer)?",["Pošle signál, když se před ním něco změní","Svítí","Přesouvá bloky","Vaří"]],
+      ["Minecraft","Kolik bloků daleko dojde signál po redstonovém prachu, než zeslábne?",["15","8","30","5"]],
+      ["Minecraft","Který blok redstonový signál zase zesílí?",["Opakovač","Píst","Truhla","Kotel"]],
+      ["Minecraft","Kde se těží prastaré úlomky na netherit?",["V Netheru","V Endu","V oceánu","V jeskyni v Overworldu"]],
+      ["Minecraft","Jaká je v novějších verzích nejnižší úroveň světa?",["−64","0","−32","−128"]],
+      ["Minecraft","Do jaké výšky sahá v novějších verzích svět?",["320","256","400","128"]],
+      ["Minecraft","Kolem jaké hloubky se dnes hledá nejvíc diamantů?",["Kolem −59","Kolem 12","Kolem 60","Kolem 100"]],
+      ["Minecraft","Která firma koupila Minecraft v roce 2014?",["Microsoft","Google","Sony","Nintendo"]],
+      ["Minecraft","Ve kterém roce Minecraft poprvé vyšel?",["2009","2005","2013","2016"]],
+      ["Minecraft","Jak se jmenuje studio, které Minecraft vyvíjí?",["Mojang","RobTop Games","Valve","Mojito"]],
+      ["Minecraft","Jak se jmenuje režim, kde máš jen jeden život a po smrti je konec?",["Hardcore","Survival","Kreativní","Divácký"]],
+      ["Minecraft","Co je to seed?",["Číslo, podle kterého se vytvoří svět","Semínko na pole","Druh rudy","Jméno serveru"]],
+      ["Minecraft","Jak se jmenuje blok, do kterého se píšou příkazy?",["Příkazový blok","Notový blok","Pozorovatel","Dispenser"]],
+      ["Minecraft","Který mob vyhrál hlasování a sbírá pro hráče předměty?",["Allay","Sniffer","Warden","Copper Golem"]],
+      ["Minecraft","Co dělá Sniffer?",["Vyhrabává stará semínka","Hlídá vesnici","Nosí věci","Střílí"]],
+      ["Minecraft","Kolik hráčů unese velbloud?",["2","1","4","3"]],
+      ["Minecraft","Co zvyšuje úroveň očarování u kouzelnického stolu?",["Knihovny okolo","Diamanty v truhle","Světlo","Výška domu"]],
+      ["Minecraft","Kolik knihoven potřebuješ na nejvyšší úroveň očarování?",["15","10","20","8"]],
+      ["Minecraft","Co udělá vypité mléko?",["Odstraní všechny efekty","Vyléčí hráče","Dá rychlost","Zažene hlad"]],
+      ["Minecraft","Co dělá totem nesmrtelnosti?",["Zachrání hráče před smrtí","Zneviditelní hráče","Přivolá blesk","Otevře portál"]],
+      ["Minecraft","Který mob pouští totem nesmrtelnosti?",["Evoker","Vindicator","Pillager","Ravager"]],
+      ["Minecraft","Jak se jmenuje velký mob s rohy, na kterém jezdí nájezdníci?",["Ravager","Hoglin","Warden","Golem"]],
+      ["Minecraft","Kdo brání vesnici před nájezdem?",["Železný golem","Vesničan s lukem","Kočka","Pes"]],
+      ["Minecraft","Z čeho se staví železný golem?",["Ze železných bloků a dýně","Z kamene a železa","Ze zlata a masa","Z hlíny a listí"]],
+      ["Minecraft","Který efekt dostaneš, když se přiblížíš k Wardenovi?",["Temnotu","Slepotu navždy","Rychlost","Sílu"]],
+      ["Minecraft","Co se stane, když Ender Drakovi znovu postavíš krystaly?",["Objeví se znovu","Nic","Zmizí End","Vypadne diamant"]],
+      ["Minecraft","Jak se jmenuje ostrov s vysokými fialovými stavbami v Endu?",["End City","Nether Fortress","Bastion","Ancient City"]],
+      ["Minecraft","Jaký blok Endermani neradi a nemohou ho zvednout?",["Obsidián","Hlínu","Písek","Květiny"]],
+      ["Minecraft","Co dělá blok Conduit pod vodou?",["Dává hráči dýchání a vidění","Svítí na povrchu","Zabíjí ryby","Vytváří proud"]],
+      ["Minecraft","Z čeho se staví Conduit?",["Z mušlí a mořského srdce","Z diamantů","Z obsidiánu","Z korálů"]],
+      ["Minecraft","Kolik různých barev vlny je ve hře?",["16","8","12","24"]],
+      ["Minecraft","Co se stane s obsidiánem, když ho těžíš bez diamantového krumpáče?",["Rozbije se, ale nic nedostaneš","Vůbec nejde rozbít","Změní se v kámen","Vybuchne"]]
+    ]
+  },
+  gd: {
+    lehke: [
+      ["Geometry Dash","Jak se jmenuje čtvrtý hlavní level?",["Dry Out","Polargeist","Jumper","Cycles"]],
+      ["Geometry Dash","Jak se jmenuje pátý hlavní level?",["Base After Base","Can't Let Go","Time Machine","xStep"]],
+      ["Geometry Dash","Jak se jmenuje šestý hlavní level?",["Can't Let Go","Base After Base","Jumper","Dry Out"]],
+      ["Geometry Dash","Jak se jmenuje sedmý hlavní level?",["Jumper","Time Machine","Cycles","Clutterfunk"]],
+      ["Geometry Dash","Jak se jmenuje osmý hlavní level?",["Time Machine","Jumper","xStep","Cycles"]],
+      ["Geometry Dash","Jak se jmenuje devátý hlavní level?",["Cycles","xStep","Clutterfunk","Time Machine"]],
+      ["Geometry Dash","Jak se jmenuje desátý hlavní level?",["xStep","Cycles","Clutterfunk","Jumper"]],
+      ["Geometry Dash","Kolik hlavních levelů má dnes hra?",["21","15","10","30"]],
+      ["Geometry Dash","Co dělá modrý skákací pad?",["Otočí gravitaci","Zrychlí hráče","Zmenší hráče","Zastaví hru"]],
+      ["Geometry Dash","Co udělá žlutý kroužek, když na něj klepneš?",["Vymrští hráče nahoru","Zpomalí hráče","Otočí obraz","Přidá minci"]],
+      ["Geometry Dash","Co dělá portál se šipkami nahoru a dolů?",["Otočí gravitaci","Změní rychlost","Zmenší postavu","Ukončí level"]],
+      ["Geometry Dash","Jak se hra ovládá na mobilu?",["Klepnutím na obrazovku","Nakláněním telefonu","Kreslením čáry","Mluvením"]],
+      ["Geometry Dash","Co znamená, že ukazatel dojde na 100 %?",["Dokončil jsi level","Vybil se ti telefon","Konec hudby","Získal jsi minci"]],
+      ["Geometry Dash","Máš v normálním režimu k dispozici kontrolní body?",["Ne, level jedeš celý znovu","Ano, každých 10 %","Ano, tři za level","Ano, kdykoli"]],
+      ["Geometry Dash","Co je ikona?",["Vzhled tvé postavy","Název levelu","Počet pokusů","Druh hudby"]],
+      ["Geometry Dash","Jaká je obtížnost levelu Stereo Madness?",["Easy","Hard","Insane","Demon"]],
+      ["Geometry Dash","Kolik hvězd dostaneš za dokončení Stereo Madness?",["1","5","10","0"]],
+      ["Geometry Dash","Jak se jmenuje verze hry zdarma s menším počtem levelů?",["Geometry Dash Lite","Geometry Dash Mini","Geometry Dash Free","Geometry Dash Demo"]],
+      ["Geometry Dash","Na jakých zařízeních se dá hrát?",["Na mobilu i na počítači","Jen na mobilu","Jen na počítači","Jen na konzoli"]],
+      ["Geometry Dash","Jak se jmenuje tlačítko, kterým to po nárazu zkusíš znovu?",["Retry","Reload","Restart level pack","Continue"]],
+      ["Geometry Dash","Co je cílem každého levelu?",["Dostat se bez nárazu na konec","Nasbírat co nejvíc bodů","Porazit soupeře","Přežít pět minut"]],
+      ["Geometry Dash","Podle čeho jsou v levelu poskládané skoky?",["Podle hudby","Podle náhody","Podle času","Podle počtu hráčů"]],
+      ["Geometry Dash","Co uvidíš nahoře uprostřed během hraní?",["Kolik procent levelu máš za sebou","Kolik máš životů","Jméno autora","Čas"]],
+      ["Geometry Dash","Co se stane, když pustíš obrazovku ve formě rakety?",["Raketa klesá dolů","Raketa stoupá nahoru","Hra se zastaví","Nic"]],
+      ["Geometry Dash","Které z těchto slov je název hlavního levelu?",["Polargeist","Polarlight","Frostbite","Icebreaker"]],
+      ["Geometry Dash","Kolik pokusů můžeš mít v jednom levelu?",["Neomezeně","Tři","Deset","Jeden za den"]],
+      ["Geometry Dash","Co dělá tlačítko pauzy?",["Zastaví hru","Ukončí hru","Zvýší rychlost","Uloží postup"]],
+      ["Geometry Dash","Jak vypadá základní forma hráče?",["Jako kostka","Jako kolo","Jako panáček","Jako auto"]],
+      ["Geometry Dash","Odemykají se v původní hře levely postupně?",["Ano, jeden po druhém","Ne, jsou hned všechny","Jen za peníze","Jen o víkendu"]],
+      ["Geometry Dash","Co se stane, když v levelu narazíš do pichlavé překážky?",["Musíš začít od začátku","Ztratíš 10 %","Vrátíš se ke kontrolnímu bodu","Nic"]]
+    ],
+    stredni: [
+      ["Geometry Dash","Jak se jmenuje jedenáctý hlavní level?",["Clutterfunk","Cycles","Theory of Everything","xStep"]],
+      ["Geometry Dash","Jak se jmenuje dvanáctý hlavní level?",["Theory of Everything","Clutterfunk","Electrodynamix","Clubstep"]],
+      ["Geometry Dash","Jak se jmenuje třináctý hlavní level?",["Electroman Adventures","Electrodynamix","Clubstep","Hexagon Force"]],
+      ["Geometry Dash","Jak se jmenuje čtrnáctý hlavní level?",["Clubstep","Electrodynamix","Deadlocked","Blast Processing"]],
+      ["Geometry Dash","Jak se jmenuje patnáctý hlavní level?",["Electrodynamix","Clubstep","Hexagon Force","Theory of Everything 2"]],
+      ["Geometry Dash","Jak se jmenuje šestnáctý hlavní level?",["Hexagon Force","Blast Processing","Deadlocked","Geometrical Dominator"]],
+      ["Geometry Dash","Jak se jmenuje sedmnáctý hlavní level?",["Blast Processing","Hexagon Force","Fingerdash","Deadlocked"]],
+      ["Geometry Dash","Jak se jmenuje dvacátý hlavní level?",["Deadlocked","Fingerdash","Clubstep","Geometrical Dominator"]],
+      ["Geometry Dash","Jak se jmenuje devatenáctý hlavní level?",["Geometrical Dominator","Deadlocked","Blast Processing","Hexagon Force"]],
+      ["Geometry Dash","Kolik hvězd potřebuješ, abys odemkl Clubstep?",["10","5","20","1"]],
+      ["Geometry Dash","Jak se ovládá forma UFO?",["Každým klepnutím poskočí ve vzduchu","Drží se prst","Ovládá se šipkami","Sama letí"]],
+      ["Geometry Dash","Co udělá modrý kroužek?",["Otočí gravitaci","Vystřelí dopředu","Zvětší postavu","Zpomalí hru"]],
+      ["Geometry Dash","Co udělá červený pad?",["Vymrští hráče hodně vysoko","Zabije hráče","Otočí obraz","Zmenší hráče"]],
+      ["Geometry Dash","Co znamená číslo Attempt na obrazovce?",["Kolikátý je to pokus","Kolik máš hvězd","Kolik zbývá procent","Kolik je hodin"]],
+      ["Geometry Dash","Co dělají portály se šipkami dopředu?",["Mění rychlost","Otáčejí gravitaci","Mění formu","Přidávají mince"]],
+      ["Geometry Dash","Co je user level?",["Level, který vytvořil jiný hráč","Level jen pro nové hráče","Level bez hudby","Testovací level"]],
+      ["Geometry Dash","Co je Daily Level?",["Level dne, který se každý den mění","Level, který trvá celý den","Nejtěžší level hry","Level jen pro předplatitele"]],
+      ["Geometry Dash","Co jsou gauntlety?",["Sady pěti levelů pohromadě","Druhy ikon","Tajné kódy","Odměny za hvězdy"]],
+      ["Geometry Dash","K čemu jsou tajné mince v levelech?",["K odemykání ikon a odměn","K nákupu života","Ke zpomalení hry","K přeskočení levelu"]],
+      ["Geometry Dash","Kolik mincí může do svého levelu dát hráč, který ho vytvořil?",["3","1","5","10"]],
+      ["Geometry Dash","Jak se jmenuje samostatná hra od stejného autora s ledovými levely?",["Geometry Dash SubZero","Geometry Dash Ice","Geometry Dash Frost","Geometry Dash Winter"]],
+      ["Geometry Dash","Kolik levelů má Geometry Dash Meltdown?",["3","5","10","1"]],
+      ["Geometry Dash","Jak se jmenuje první level v SubZero?",["Press Start","Nock Em","Power Trip","Stereo Madness"]],
+      ["Geometry Dash","Co je Vault?",["Tajná místnost, kde se zadávají kódy","Obchod s ikonami","Seznam nejlepších hráčů","Editor levelů"]],
+      ["Geometry Dash","Co znamená, že je level Featured?",["Vybral ho autor hry mezi doporučené","Je zdarma","Je nejtěžší","Nemá hudbu"]],
+      ["Geometry Dash","Co dělá zrcadlový portál?",["Převrátí obraz zprava doleva","Zmenší postavu","Zrychlí hudbu","Přidá mince"]],
+      ["Geometry Dash","Co dělá portál, který mění velikost?",["Zmenší nebo zvětší postavu","Změní barvu","Změní hudbu","Otočí gravitaci"]],
+      ["Geometry Dash","Co dělá dual portál?",["Rozdělí hráče na dvě postavy","Zdvojnásobí body","Přidá druhý level","Zrychlí hru"]],
+      ["Geometry Dash","Jak se jmenuje seznam nejlepších hráčů ve hře?",["Leaderboard","Vault","Gauntlet","Editor"]],
+      ["Geometry Dash","K čemu slouží cvičný režim?",["Nacvičit si těžká místa s kontrolními body","Získat víc hvězd","Odemknout ikony","Hrát bez hudby"]],
+      ["Geometry Dash","Počítá se dokončení ve cvičném režimu jako opravdové dokončení?",["Ne","Ano","Ano, ale za polovinu hvězd","Jen u snadných levelů"]]
+    ],
+    tezke: [
+      ["Geometry Dash","Ve kterém roce vyšla velká aktualizace 2.2?",["2023","2019","2021","2016"]],
+      ["Geometry Dash","Jakou úplně novou formu přidala verze 2.2?",["Swing","Spider","Wave","Robot"]],
+      ["Geometry Dash","Jak se ve verzi 2.2 začalo říkat hvězdám za hlavní levely?",["Měsíce","Slunce","Krystaly","Diamanty"]],
+      ["Geometry Dash","Jaký nový herní režim přidala verze 2.2?",["Platformer","Závodní","Souboje hráčů","Stavěcí"]],
+      ["Geometry Dash","Kdo složil hudbu k levelu Deadlocked?",["F-777","Waterflame","DJVI","MDK"]],
+      ["Geometry Dash","Kdo složil hudbu k levelu Jumper?",["Waterflame","F-777","ForeverBound","MDK"]],
+      ["Geometry Dash","Kdo složil hudbu k prvnímu levelu Stereo Madness?",["ForeverBound","DJVI","Waterflame","Dex Arson"]],
+      ["Geometry Dash","Kdo složil hudbu k levelu Fingerdash?",["MDK","F-777","Step","DJVI"]],
+      ["Geometry Dash","Kdo složil hudbu k levelu Back On Track?",["DJVI","Waterflame","MDK","F-777"]],
+      ["Geometry Dash","Kolik stupňů má obtížnost Demon?",["5","3","2","10"]],
+      ["Geometry Dash","Jak se jmenuje nejtěžší stupeň demonů?",["Extreme Demon","Insane Demon","Super Demon","Mega Demon"]],
+      ["Geometry Dash","Jak se jmenuje slavný extreme demon od hráče Riot?",["Bloodbath","Deadlocked","Cataclysm","Sonic Wave"]],
+      ["Geometry Dash","Kterou formu přidala verze 2.1?",["Spider","Ship","Ball","Cube"]],
+      ["Geometry Dash","K čemu slouží démonské klíče?",["K otevření truhly s odměnami","K odemčení demonů","Ke zrychlení hry","K vytvoření levelu"]],
+      ["Geometry Dash","Ze které země pochází autor hry?",["Ze Švédska","Z Ameriky","Z Německa","Z Japonska"]],
+      ["Geometry Dash","Jak se jmenuje firma, pod kterou hra vychází?",["RobTop Games","Mojang","Valve","Rovio"]],
+      ["Geometry Dash","Co znamená zkratka LDM u levelů?",["Režim s méně detaily","Nejtěžší obtížnost","Level dne","Dlouhý level"]],
+      ["Geometry Dash","Co znamená, že RobTop levelu udělí hvězdy?",["Level je oficiálně ohodnocený","Level je smazaný","Level je zdarma","Level je jen pro mobily"]],
+      ["Geometry Dash","Jak se jmenuje černý kroužek, který hráče srazí dolů?",["Černý orb","Modrý orb","Zelený orb","Fialový orb"]],
+      ["Geometry Dash","Co udělá zelený kroužek?",["Otočí gravitaci a vymrští hráče","Zpomalí hru","Zmenší hráče","Přidá minci"]],
+      ["Geometry Dash","Co dělá fialový kroužek?",["Vymrští hráče jen kousek","Otočí obraz","Zvětší hráče","Ukončí level"]],
+      ["Geometry Dash","Kolik levelů má Geometry Dash World?",["10","3","21","5"]],
+      ["Geometry Dash","Jak se jmenuje první level v Geometry Dash Meltdown?",["The Seven Seas","Viking Arena","Airborne Robots","Press Start"]],
+      ["Geometry Dash","Který hlavní level má obtížnost Demon?",["Clubstep","Jumper","Dry Out","Polargeist"]],
+      ["Geometry Dash","Jak se ovládá forma robota?",["Delším podržením skočí výš","Klepnutím letí nahoru","Sama běží","Ovládá se dvěma prsty"]],
+      ["Geometry Dash","Co dělá forma pavouka?",["Okamžitě se přemístí ke stropu nebo podlaze","Leze po zdech","Střílí pavučinu","Zpomalí hru"]],
+      ["Geometry Dash","Jak se jmenuje forma, která létá po vlnovce a je nejtenčí?",["Wave","Ball","Ufo","Swing"]],
+      ["Geometry Dash","Co dělá hráč ve formě míčku?",["Klepnutím mění gravitaci","Skáče do výšky","Kutálí se sám","Letí nahoru"]],
+      ["Geometry Dash","Co jsou to Map Packs?",["Skupiny tří levelů za odměnu","Mapy světa","Balíčky ikon","Druhy hudby"]],
+      ["Geometry Dash","Co se schová v Treasure Room?",["Truhly, které se otevírají klíči","Nové levely","Seznam hráčů","Editor"]],
+      ["Geometry Dash","Jak se jmenuje týdenní nejtěžší level ve hře?",["Weekly Demon","Daily Level","Gauntlet","Featured"]]
+    ]
+  }
+};
+
+const EXTRA3 = {
+  pokemon: {
+    lehke: [
+      ["Pokémon","Co se dělá v pokémon centru?",["Léčí se tam pokémoni","Prodávají se míčky","Trénuje se tam","Bydlí tam trenéři"]],
+      ["Pokémon","Jak se jmenuje sestřička v pokémon centru?",["Sestra Joy","Sestra May","Sestra Ivy","Sestra Erika"]],
+      ["Pokémon","Jakého typu je Geodude?",["Kamenného","Vodního","Travního","Ledového"]],
+      ["Pokémon","Který pokémon vypadá jako růžový balónek a uspává zpěvem?",["Jigglypuff","Clefairy","Chansey","Ditto"]],
+      ["Pokémon","Jakého typu je Onix?",["Kamenného","Ohnivého","Elektrického","Vodního"]],
+      ["Pokémon","Jakého typu je Caterpie?",["Hmyzího","Travního","Jedového","Létavého"]],
+      ["Pokémon","Jakého typu je Magikarp?",["Vodního","Dračího","Normálního","Hmyzího"]],
+      ["Pokémon","Jak se jmenuje Ashův rival ze začátku seriálu?",["Gary","Brock","Tracey","James"]],
+      ["Pokémon","Jak se jmenuje nejsilnější míček, který chytí pokémona vždycky?",["Master Ball","Great Ball","Ultra Ball","Safari Ball"]],
+      ["Pokémon","Co dáš pokémonovi, když je zraněný?",["Lektvar","Bobuli na štěstí","Pokéball","Odznak"]],
+      ["Pokémon","Kolik odznaků se sbírá v regionu Kanto?",["8","4","6","12"]],
+      ["Pokémon","Který pokémon je žlutá kachna, kterou bolí hlava?",["Psyduck","Squirtle","Golduck","Farfetch'd"]],
+      ["Pokémon","Jakého typu je Machop?",["Bojového","Kamenného","Ocelového","Zemního"]],
+      ["Pokémon","Co musí trenér udělat, aby získal odznak?",["Porazit vůdce arény","Nasbírat 100 pokéballů","Projít lesem","Vyhrát závod"]],
+      ["Pokémon","Kdo je Ashův nejvěrnější pokémon?",["Pikachu","Bulbasaur","Charizard","Squirtle"]]
+    ],
+    stredni: [
+      ["Pokémon","Na koho se vyvine Bulbasaur?",["Na Ivysaura","Na Venusaura","Na Oddishe","Na Chikoritu"]],
+      ["Pokémon","Na koho se vyvine Ivysaur?",["Na Venusaura","Na Bulbasaura","Na Meganium","Na Vileplume"]],
+      ["Pokémon","Na koho se vyvine Wartortle?",["Na Blastoise","Na Squirtla","Na Feraligatra","Na Poliwratha"]],
+      ["Pokémon","Na koho se vyvine Caterpie?",["Na Metapoda","Na Butterfree","Na Weedla","Na Kakunu"]],
+      ["Pokémon","Na koho se vyvine Magikarp?",["Na Gyaradose","Na Milotic","Na Seakinga","Na Lapras"]],
+      ["Pokémon","Na koho se vyvine Pikachu?",["Na Raichu","Na Pichu","Na Electabuzze","Na Jolteona"]],
+      ["Pokémon","Z koho se vyvine Pikachu?",["Z Pichu","Z Raichu","Z Eevee","Z Togepi"]],
+      ["Pokémon","Který typ je silný proti kamenným pokémonům?",["Vodní","Ohnivý","Létavý","Normální"]],
+      ["Pokémon","Na jaký typ vůbec nefunguje elektřina?",["Na zemní","Na vodní","Na létavý","Na ocelový"]],
+      ["Pokémon","Jak se jmenuje první vůdce arény v Kantu?",["Brock","Misty","Lt. Surge","Erika"]],
+      ["Pokémon","Jaký typ používá Brock ve své aréně?",["Kamenný","Vodní","Elektrický","Travní"]],
+      ["Pokémon","Jaký typ používá Misty ve své aréně?",["Vodní","Ohnivý","Kamenný","Psychický"]],
+      ["Pokémon","Na koho se vyvine Eevee po použití ohnivého kamene?",["Na Flareona","Na Vaporeona","Na Jolteona","Na Espeona"]],
+      ["Pokémon","Na koho se vyvine Eevee po použití hromového kamene?",["Na Jolteona","Na Flareona","Na Umbreona","Na Leafeona"]],
+      ["Pokémon","Jak se jmenuje region druhé generace?",["Johto","Kanto","Hoenn","Unova"]]
+    ],
+    tezke: [
+      ["Pokémon","Kolik typů pokémonů dnes existuje?",["18","15","20","12"]],
+      ["Pokémon","Který typ byl přidán až v šesté generaci?",["Vílí","Temný","Ocelový","Dračí"]],
+      ["Pokémon","Který pokémon je na obalu hry Pokémon Red?",["Charizard","Blastoise","Venusaur","Pikachu"]],
+      ["Pokémon","Který pokémon je na obalu hry Pokémon Blue?",["Blastoise","Charizard","Mewtwo","Gyarados"]],
+      ["Pokémon","Jakého typu je Snorlax?",["Normálního","Zemního","Bojového","Temného"]],
+      ["Pokémon","Jaké dva typy má Lapras?",["Vodní a ledový","Vodní a dračí","Ledový a létavý","Vodní a psychický"]],
+      ["Pokémon","Který pokémon má v Pokédexu číslo 151?",["Mew","Mewtwo","Dragonite","Articuno"]],
+      ["Pokémon","Kolik různých vývojů má dnes Eevee?",["8","3","5","12"]],
+      ["Pokémon","Na koho se Eevee vyvine, když je s ním trenér kamarád a je den?",["Na Espeona","Na Umbreona","Na Sylveona","Na Glaceona"]],
+      ["Pokémon","Který vývoj Eevee je vílího typu?",["Sylveon","Espeon","Leafeon","Glaceon"]],
+      ["Pokémon","Který vývoj Eevee je travního typu?",["Leafeon","Glaceon","Umbreon","Vaporeon"]],
+      ["Pokémon","Ze které generace pochází legendární Lugia?",["Z druhé","Z první","Ze třetí","Z páté"]],
+      ["Pokémon","Který pokémon umí napodobit jakéhokoli jiného pokémona?",["Ditto","Mew","Zorua","Smeargle"]],
+      ["Pokémon","Kdo navrhl vzhled většiny původních pokémonů?",["Ken Sugimori","Satoshi Tajiri","Junichi Masuda","Shigeru Miyamoto"]],
+      ["Pokémon","Který legendární pták Kanta je ledového typu?",["Articuno","Zapdos","Moltres","Lugia"]]
+    ]
+  },
+  pocitace: {
+    lehke: [
+      ["Informatika","K čemu slouží klávesa Shift?",["K psaní velkých písmen","K vypnutí počítače","Ke zvýšení hlasitosti","K tisku"]],
+      ["Informatika","Co je soubor?",["Uložená data s vlastním názvem","Část klávesnice","Druh internetu","Program na kreslení"]],
+      ["Informatika","K čemu je složka?",["Aby v ní byly srovnané soubory","Ke zrychlení počítače","K připojení k internetu","K tisku"]],
+      ["Informatika","K čemu slouží USB flash disk?",["K přenášení souborů","K nabíjení monitoru","K psaní textu","K měření času"]],
+      ["Informatika","K čemu slouží e-mail?",["K posílání zpráv přes internet","K ukládání fotek","K vypnutí počítače","K hraní her"]],
+      ["Informatika","Co je tablet?",["Počítač s dotykovou obrazovkou","Druh tiskárny","Program","Kabel"]],
+      ["Informatika","Co dělá klávesa Delete?",["Maže označené","Ukládá soubor","Zvětšuje písmo","Vypíná zvuk"]],
+      ["Informatika","Co je kurzor?",["Značka, která ukazuje, kde píšeš","Druh myši","Název programu","Obrázek na ploše"]],
+      ["Informatika","K čemu slouží webkamera?",["K natáčení a videohovorům","K tisku","K nabíjení","K měření teploty"]],
+      ["Informatika","Máš své heslo prozradit kamarádovi?",["Ne, heslo je tajné","Ano, kamarádovi ano","Ano, když poprosí","Jen ve škole"]],
+      ["Informatika","Co uděláš, když ti někdo cizí na internetu píše divné zprávy?",["Řeknu to rodičům","Odpovím mu","Pošlu mu fotku","Smažu si počítač"]],
+      ["Informatika","Jak se jmenuje malý obrázek, kterým se spouští program?",["Ikona","Kurzor","Pixel","Soubor"]],
+      ["Informatika","Kam se připojují sluchátka u počítače?",["Do konektoru pro zvuk","Do síťové zásuvky","Do tiskárny","Do klávesnice"]],
+      ["Informatika","Co dělá reproduktor?",["Přehrává zvuk","Zobrazuje obraz","Tiskne","Ukládá data"]],
+      ["Informatika","Jak se správně vypíná počítač?",["Přes nabídku vypnutí","Vytažením kabelu","Zavřením víka pěstí","Vypnutím monitoru"]]
+    ],
+    stredni: [
+      ["Informatika","Co je hardware?",["Části počítače, na které si sáhneš","Programy v počítači","Připojení k internetu","Druh souboru"]],
+      ["Informatika","Co je software?",["Programy a aplikace","Kabely a myš","Obrazovka","Klávesnice"]],
+      ["Informatika","K čemu slouží operační systém, třeba Windows?",["Řídí celý počítač","Připojuje tiskárnu","Kreslí obrázky","Píše e-maily"]],
+      ["Informatika","Jaký obsah má soubor s příponou .mp4?",["Video","Obrázek","Tabulku","Program"]],
+      ["Informatika","Jaký znak musí být v každé e-mailové adrese?",["Zavináč","Hvězdička","Vykřičník","Tečka na začátku"]],
+      ["Informatika","Co znamená, že mám data v cloudu?",["Jsou uložená na internetu","Jsou smazaná","Jsou jen v mobilu","Jsou vytištěná"]],
+      ["Informatika","K čemu slouží antivirus?",["Chrání počítač před škodlivými programy","Zrychluje internet","Tiskne dokumenty","Nabíjí baterii"]],
+      ["Informatika","Co je spam?",["Nevyžádaná pošta","Rychlý internet","Druh hry","Chyba tiskárny"]],
+      ["Informatika","Co udělá zkratka Ctrl+Z?",["Vrátí poslední krok zpět","Uloží soubor","Vytiskne stránku","Zavře program"]],
+      ["Informatika","Co udělá zkratka Ctrl+S?",["Uloží soubor","Smaže text","Vybere vše","Vypne počítač"]],
+      ["Informatika","Co je pixel?",["Nejmenší bod obrázku","Jednotka rychlosti","Druh kabelu","Program"]],
+      ["Informatika","Ze kterých tří barev se míchají barvy na obrazovce?",["Červená, zelená, modrá","Žlutá, modrá, červená","Bílá, černá, šedá","Zelená, žlutá, fialová"]],
+      ["Informatika","K čemu slouží vyhledávač na internetu?",["K hledání stránek podle slov","K ukládání fotek","K tisku","K posílání pošty"]],
+      ["Informatika","Co je aplikace v mobilu?",["Program pro určitou činnost","Druh baterie","Obrazovka","Kabel"]],
+      ["Informatika","Co znamená stahování souboru?",["Přenesení souboru z internetu do zařízení","Smazání souboru","Odeslání e-mailu","Vytištění"]]
+    ],
+    tezke: [
+      ["Informatika","Kdo je považován za otce moderní informatiky a rozluštil šifru Enigma?",["Alan Turing","Bill Gates","Steve Jobs","Charles Babbage"]],
+      ["Informatika","Kolik různých hodnot dokáže uložit jeden bajt?",["256","8","100","1024"]],
+      ["Informatika","Jak se ve dvojkové soustavě zapíše číslo 3?",["11","10","01","111"]],
+      ["Informatika","Co je IP adresa?",["Číselná adresa zařízení v síti","Jméno uživatele","Druh souboru","Heslo k Wi-Fi"]],
+      ["Informatika","Co dělá server?",["Poskytuje data ostatním počítačům","Tiskne dokumenty","Chrání před viry","Nabíjí zařízení"]],
+      ["Informatika","Kdo vymyslel World Wide Web?",["Tim Berners-Lee","Bill Gates","Alan Turing","Steve Wozniak"]],
+      ["Informatika","Co je v programování cyklus?",["Opakování stejných příkazů","Chyba v programu","Druh proměnné","Konec programu"]],
+      ["Informatika","K čemu slouží podmínka (if) v programu?",["Program se podle ní rozhodne","Opakuje příkazy","Uloží soubor","Spustí hudbu"]],
+      ["Informatika","Co je proměnná?",["Místo v paměti pro uložení hodnoty","Druh kabelu","Chyba programu","Jméno souboru"]],
+      ["Informatika","Který jazyk určuje vzhled a barvy webových stránek?",["CSS","HTML","JavaScript","Python"]],
+      ["Informatika","Který jazyk se stará o chování a interaktivitu stránek?",["JavaScript","CSS","HTML","SQL"]],
+      ["Informatika","Co je umělá inteligence?",["Program, který se učí a řeší úlohy","Druh robota z kovu","Rychlý internet","Nový počítač"]],
+      ["Informatika","Kolik megabajtů má přibližně jeden gigabajt?",["1024","100","10","500"]],
+      ["Informatika","Co znamená písmeno S na konci https?",["Že je spojení zabezpečené","Že je stránka rychlá","Že je stránka česká","Že je stránka nová"]],
+      ["Informatika","Co dělá klávesová zkratka Ctrl+A?",["Označí všechno","Uloží soubor","Zavře okno","Vytiskne stránku"]]
+    ]
+  },
+  skola: {
+    lehke: [
+      ["Počítání","Kolik je 6 × 8?",["48","42","54","56"]],
+      ["Počítání","Kolik je 7 × 9?",["63","56","72","69"]],
+      ["Počítání","Kolik je 84 : 4?",["21","24","18","22"]],
+      ["Počítání","Kolik je 36 + 47?",["83","73","87","93"]],
+      ["Počítání","Kolik je 200 − 85?",["115","125","105","135"]],
+      ["Počítání","Kolik je 5 × 12?",["60","50","65","55"]],
+      ["Počítání","Kolik je 63 : 9?",["7","8","6","9"]],
+      ["Počítání","Kolik je polovina ze 60?",["30","20","40","15"]],
+      ["Počítání","Kolik je 25 + 25 + 25 + 25?",["100","75","125","90"]],
+      ["Počítání","Kolik minut je hodina a půl?",["90","75","100","120"]],
+      ["Počítání","Kolik dní má duben?",["30","31","29","28"]],
+      ["Počítání","Kolik hodin má půl dne?",["12","6","24","8"]],
+      ["Počítání","Jak se jmenuje výsledek sčítání?",["Součet","Rozdíl","Součin","Podíl"]],
+      ["Počítání","Jak se jmenuje výsledek odčítání?",["Rozdíl","Součet","Součin","Zbytek"]],
+      ["Počítání","Kolik je nula krát osm?",["0","8","1","80"]],
+      ["Jazyk","Jak se jmenuje čtyřúhelník, který má všechny strany stejně dlouhé?",["Čtverec","Obdélník","Kosočtverec s různými úhly","Lichoběžník"]],
+      ["Jazyk","Kolik písmen má slovo Minecraft?",["9","8","10","11"]],
+      ["Jazyk","Jaké je množné číslo od slova dítě?",["Děti","Dítěta","Dětové","Dítata"]],
+      ["Jazyk","Jak se jmenuje opak slova starý?",["Nový","Malý","Tichý","Rychlý"]],
+      ["Jazyk","Které z těchto slov se píše s velkým písmenem?",["Praha","škola","kočka","zahrada"]]
+    ],
+    stredni: [
+      ["Počítání","Kolik je 14 × 5?",["70","65","75","60"]],
+      ["Počítání","Kolik je 18 × 3?",["54","48","56","51"]],
+      ["Počítání","Kolik je 132 : 11?",["12","11","13","14"]],
+      ["Počítání","Kolik jsou dvě třetiny z 90?",["60","45","30","70"]],
+      ["Počítání","Kolik je 1,5 × 2?",["3","2,5","3,5","4"]],
+      ["Počítání","Kolik je 7 × 6 + 8?",["50","48","54","42"]],
+      ["Počítání","Kolik je 100 : 4?",["25","20","30","40"]],
+      ["Počítání","Jaký je obvod čtverce se stranou 5 cm?",["20 cm","10 cm","25 cm","15 cm"]],
+      ["Počítání","Jaký je obsah čtverce se stranou 4 cm?",["16 cm²","8 cm²","12 cm²","20 cm²"]],
+      ["Počítání","Jaký je obvod obdélníku se stranami 3 cm a 5 cm?",["16 cm","15 cm","8 cm","20 cm"]],
+      ["Počítání","Kolik bude hodin 45 minut po 10:30?",["11:15","11:00","11:30","10:75"]],
+      ["Počítání","Kolik hodin uplyne od 8:00 do 15:00?",["7","6","8","9"]],
+      ["Tvary a míry","Jak se jmenuje čára, která nemá začátek ani konec?",["Přímka","Úsečka","Polopřímka","Křivka"]],
+      ["Tvary a míry","Jak se jmenuje čára mezi dvěma body?",["Úsečka","Přímka","Kruh","Oblouk"]],
+      ["Jazyk","Jakým slovním druhem je slovo rychle?",["Příslovce","Sloveso","Podstatné jméno","Číslovka"]],
+      ["Jazyk","Jakým slovním druhem jsou slova a, ale, nebo?",["Spojky","Předložky","Citoslovce","Zájmena"]],
+      ["Jazyk","Kolik rodů rozeznáváme u podstatných jmen?",["3","2","4","7"]],
+      ["Jazyk","Na jaké otázky se ptáme čtvrtým pádem?",["Koho, co","Kdo, co","Komu, čemu","Kým, čím"]],
+      ["Jazyk","Jak se jmenuje část slova, která se při ohýbání nemění?",["Kořen","Předpona","Koncovka","Přípona"]],
+      ["Jazyk","Jakým slovním druhem je slovo pod?",["Předložka","Příslovce","Sloveso","Spojka"]]
+    ],
+    tezke: [
+      ["Počítání","Kolik je 23 × 7?",["161","151","171","147"]],
+      ["Počítání","Kolik je 256 : 8?",["32","28","34","36"]],
+      ["Počítání","Kolik je 15 × 15?",["225","215","250","205"]],
+      ["Počítání","Kolik je 3 × 3 × 3 × 3?",["81","27","64","243"]],
+      ["Počítání","Kolik je čtvrtina z 200?",["50","40","25","100"]],
+      ["Počítání","Jaký je obsah obdélníku se stranami 7 cm a 8 cm?",["56 cm²","30 cm²","15 cm²","64 cm²"]],
+      ["Počítání","Kolik milimetrů má 25 centimetrů?",["250","25","2500","2,5"]],
+      ["Počítání","Kolik gramů má 2,5 kilogramu?",["2500","250","25 000","25"]],
+      ["Počítání","Kolik minut má 3,5 hodiny?",["210","180","240","195"]],
+      ["Počítání","Kolik sekund má čtvrt hodiny?",["900","600","1500","450"]],
+      ["Počítání","Jaký je průměr čísel 4, 8 a 12?",["8","6","12","10"]],
+      ["Počítání","Kolik je 999 : 9?",["111","101","119","99"]],
+      ["Tvary a míry","Kolik stupňů má přímý úhel?",["180","90","360","270"]],
+      ["Tvary a míry","Jak se jmenuje trojúhelník s jedním pravým úhlem?",["Pravoúhlý","Rovnostranný","Tupoúhlý","Ostroúhlý"]],
+      ["Tvary a míry","Kolik úhlopříček má čtverec?",["2","4","1","3"]],
+      ["Tvary a míry","Jak se jmenuje mnohoúhelník s dvanácti stranami?",["Dvanáctiúhelník","Osmiúhelník","Desetiúhelník","Šestiúhelník"]],
+      ["Tvary a míry","Kolik centimetrů čtverečních má čtverec se stranou 10 cm?",["100","10","1000","50"]],
+      ["Jazyk","Na jaké otázky se ptáme sedmým pádem?",["Kým, čím","Koho, co","O kom, o čem","Komu, čemu"]],
+      ["Jazyk","Které slovo patří mezi vyjmenovaná slova po B?",["Bydlet","Bílý","Bratr","Balón"]],
+      ["Jazyk","Jak se jmenuje slovní druh, který nahrazuje jména, například on nebo ona?",["Zájmeno","Číslovka","Citoslovce","Částice"]]
+    ]
+  },
+  svet: {
+    lehke: [
+      ["Zeměpis","Jaké je hlavní město Španělska?",["Madrid","Barcelona","Lisabon","Sevilla"]],
+      ["Zeměpis","Jaké je hlavní město Maďarska?",["Budapešť","Bukurešť","Bělehrad","Sofie"]],
+      ["Zeměpis","Který stát sousedí s Českem na západě?",["Německo","Slovensko","Rakousko","Polsko"]],
+      ["Zeměpis","Jak se jmenuje česká měna?",["Koruna","Euro","Zlotý","Forint"]],
+      ["Zeměpis","Jak se jmenuje měna, kterou platí většina států Evropské unie?",["Euro","Dolar","Libra","Frank"]],
+      ["Zeměpis","Kolik krajů má Česko?",["14","10","8","20"]],
+      ["Zeměpis","Který světadíl je největší?",["Asie","Afrika","Evropa","Amerika"]],
+      ["Zeměpis","Kolik oceánů má Země?",["5","3","7","2"]],
+      ["Zeměpis","Na kterém světadílu volně žijí klokani?",["V Austrálii","V Africe","V Asii","V Evropě"]],
+      ["Zeměpis","Kde volně žijí tučňáci?",["Na jižní polokouli a v Antarktidě","Na severním pólu","V Evropě","V Sahaře"]],
+      ["Zeměpis","Ve kterém městě stojí šikmá věž?",["V Pise","V Římě","V Miláně","V Turíně"]],
+      ["Zeměpis","Ve které zemi stojí věž Big Ben?",["V Anglii","Ve Francii","V Německu","V Irsku"]],
+      ["Zeměpis","Ve které zemi stojí Socha svobody?",["V USA","Ve Francii","V Kanadě","V Mexiku"]],
+      ["Česko","Jak se jmenuje slavné pražské náměstí se sochou svatého Václava na koni?",["Václavské","Staroměstské","Karlovo","Náměstí Míru"]],
+      ["Sport","Jak se jmenuje běžecký závod dlouhý přes 42 kilometrů?",["Maraton","Sprint","Štafeta","Triatlon"]],
+      ["Sport","Kolik hráčů má na hřišti volejbalový tým?",["6","5","7","11"]],
+      ["Zeměpis","Jak se jmenuje moře na sever od Polska?",["Baltské","Černé","Jaderské","Severní ledové"]],
+      ["Zeměpis","Ve které zemi se mluví italsky?",["V Itálii","Ve Španělsku","V Rumunsku","V Řecku"]],
+      ["Zeměpis","Na které řece leží přehrada Lipno?",["Na Vltavě","Na Labi","Na Moravě","Na Ohři"]],
+      ["Umění","Jakou barvu dostaneš smícháním červené a žluté?",["Oranžovou","Zelenou","Fialovou","Hnědou"]]
+    ],
+    stredni: [
+      ["Zeměpis","Jaké je hlavní město Švédska?",["Stockholm","Oslo","Helsinky","Kodaň"]],
+      ["Zeměpis","Jaké je hlavní město Ruska?",["Moskva","Petrohrad","Kyjev","Minsk"]],
+      ["Zeměpis","Jaké je hlavní město Číny?",["Peking","Šanghaj","Hongkong","Tokio"]],
+      ["Zeměpis","Jaké je hlavní město Kanady?",["Ottawa","Toronto","Montreal","Vancouver"]],
+      ["Zeměpis","Jaké je hlavní město Austrálie?",["Canberra","Sydney","Melbourne","Perth"]],
+      ["Zeměpis","Jaké je hlavní město Řecka?",["Atény","Soluň","Sparta","Korint"]],
+      ["Zeměpis","Jak se jmenuje nejdelší řeka Evropy?",["Volha","Dunaj","Rýn","Labe"]],
+      ["Česko","Které město je největší v Česku?",["Praha","Brno","Ostrava","Plzeň"]],
+      ["Dějiny","Kdo byl Napoleon Bonaparte?",["Francouzský vojevůdce a císař","Anglický král","Italský malíř","Ruský car"]],
+      ["Dějiny","Ve kterém století začala první světová válka?",["Ve 20.","V 19.","V 18.","V 17."]],
+      ["Dějiny","Ve kterém roce začala druhá světová válka?",["1939","1914","1945","1918"]],
+      ["Umění","Kdo napsal knihu Malý princ?",["Antoine de Saint-Exupéry","Astrid Lindgrenová","Roald Dahl","Jules Verne"]],
+      ["Umění","Kdo napsal knihu o Pipi Dlouhé punčoše?",["Astrid Lindgrenová","Božena Němcová","J. K. Rowlingová","Karel Čapek"]],
+      ["Sport","Kolik hráčů má na ledě hokejový tým i s brankářem?",["6","5","7","11"]],
+      ["Sport","Jak často se konají zimní olympijské hry?",["Každé čtyři roky","Každý rok","Každé dva roky","Každých osm let"]],
+      ["Sport","Kdo byl Emil Zátopek?",["Slavný běžec","Hokejista","Tenista","Plavec"]],
+      ["Sport","V jakém sportu je slavný turnaj Wimbledon?",["V tenise","Ve fotbale","V golfu","V šachu"]],
+      ["Zeměpis","Ve které zemi leží město Benátky, kde se jezdí po kanálech?",["V Itálii","V Nizozemsku","V Řecku","Ve Španělsku"]],
+      ["Zeměpis","Jak se jmenuje nejznámější poušť v Asii mezi Čínou a Mongolskem?",["Gobi","Sahara","Kalahari","Atacama"]],
+      ["Česko","Ve kterém kraji leží město Ostrava?",["V Moravskoslezském","V Jihomoravském","Ve Zlínském","V Olomouckém"]]
+    ],
+    tezke: [
+      ["Dějiny","Jak se jmenuje nejdelší zeď na světě?",["Velká čínská zeď","Hadriánův val","Berlínská zeď","Zeď nářků"]],
+      ["Dějiny","Kdo byl Jan Žižka?",["Husitský vojevůdce","Český král","Malíř","Skladatel"]],
+      ["Dějiny","Ve kterém roce byl upálen Jan Hus?",["1415","1348","1620","1526"]],
+      ["Dějiny","Ve kterém roce se Československo rozdělilo na dva státy?",["1993","1989","1968","1918"]],
+      ["Dějiny","Kdo byl prvním prezidentem samostatné České republiky?",["Václav Havel","Václav Klaus","T. G. Masaryk","Miloš Zeman"]],
+      ["Dějiny","Ve kterém roce byla sametová revoluce?",["1989","1968","1993","1945"]],
+      ["Dějiny","Ve kterém roce vstoupilo Česko do Evropské unie?",["2004","1999","2010","1993"]],
+      ["Dějiny","Kdo byla Marie Terezie?",["Rakouská panovnice a česká královna","Česká spisovatelka","Ruská carevna","Anglická královna"]],
+      ["Dějiny","Kdo postavil Koloseum?",["Římané","Řekové","Egypťané","Keltové"]],
+      ["Zeměpis","Ve kterém městě stojí Koloseum?",["V Římě","V Athénách","V Neapoli","V Miláně"]],
+      ["Zeměpis","Jak se jmenuje nejvyšší budova světa?",["Burdž Chalífa","Empire State Building","Eiffelovka","Shanghai Tower"]],
+      ["Zeměpis","Jak se jmenuje nejvyšší hora Afriky?",["Kilimandžáro","Mount Kenya","Atlas","Table Mountain"]],
+      ["Zeměpis","Jak se jmenuje nejvyšší vodopád světa?",["Andělský vodopád","Niagarské vodopády","Viktoriiny vodopády","Iguazú"]],
+      ["Zeměpis","Jaké je hlavní město Turecka?",["Ankara","Istanbul","Izmir","Bursa"]],
+      ["Zeměpis","Jak se jmenuje průliv mezi Anglií a Francií?",["Lamanšský","Gibraltarský","Bosporský","Dánský"]],
+      ["Umění","Kdo namaloval cyklus obrazů Slovanská epopej?",["Alfons Mucha","Josef Mánes","Mikoláš Aleš","Max Švabinský"]],
+      ["Umění","Kdo složil Ódu na radost, hymnu Evropské unie?",["Ludwig van Beethoven","W. A. Mozart","Antonín Dvořák","Johann Strauss"]],
+      ["Dějiny","Kdo jako první obeplul svět?",["Výprava Ferdinanda Magellana","Kryštof Kolumbus","Marco Polo","Vasco da Gama"]],
+      ["Dějiny","Jak se jmenovalo písmo, kterým psali Sumerové?",["Klínové","Hieroglyfy","Runy","Latinka"]],
+      ["Zeměpis","Který stát leží na dvou světadílech, v Evropě i v Asii?",["Turecko","Itálie","Egypt","Řecko"]]
+    ]
+  },
+  vesmir: {
+    lehke: [
+      ["Vesmír","Co je hvězda?",["Obrovská koule žhavého plynu","Velký kámen","Kus ledu","Umělá družice"]],
+      ["Vesmír","Jak se říká světelným závojům, které svítí na obloze u pólů?",["Polární záře","Duha","Blesky","Mlhovina"]],
+      ["Vesmír","Jak se říká úkazu, kdy se po obloze mihne světelná čára?",["Padající hvězda","Kometa","Družice","Zatmění"]],
+      ["Vesmír","Jaký tvar má Země?",["Je skoro kulatá","Je placatá","Je hranatá","Je jako vejce naležato"]],
+      ["Vesmír","Kdo byl první živý tvor vyslaný na oběžnou dráhu?",["Fena Lajka","Opice Albert","Kocour Félicette","Kůň"]],
+      ["Vesmír","Kolik hodin trvá jedno otočení Země kolem osy?",["24","12","365","48"]],
+      ["Vesmír","Je na Měsíci vzduch k dýchání?",["Ne, není tam vzduch","Ano, jako na Zemi","Ano, ale je studený","Jen ve dne"]],
+      ["Vesmír","Který objekt vidíme v noci na obloze největší?",["Měsíc","Mars","Polárku","Venuši"]],
+      ["Vesmír","Co uvidíš na povrchu Měsíce?",["Krátery","Lesy","Řeky","Města"]],
+      ["Vesmír","Proč se hvězdy zdají malé jako tečky?",["Jsou strašně daleko","Jsou opravdu malé","Zakrývá je mrak","Špatně svítí"]],
+      ["Vesmír","Jak se říká lidem, kteří studují hvězdy?",["Astronomové","Astrologové","Geologové","Meteorologové"]],
+      ["Vesmír","Jak se jmenuje hvězda, podle které se dá najít sever?",["Polárka","Sírius","Vega","Slunce"]]
+    ],
+    stredni: [
+      ["Vesmír","Kolik měsíců obíhá kolem Marsu?",["2","1","4","0"]],
+      ["Vesmír","Jak se jmenují Marsovy měsíce?",["Phobos a Deimos","Titan a Rhea","Io a Europa","Luna a Selena"]],
+      ["Vesmír","Jak se jmenuje soustava planet obíhajících kolem Slunce?",["Sluneční soustava","Mléčná dráha","Galaxie","Souhvězdí"]],
+      ["Vesmír","Které z těchto planet jsou kamenné?",["Merkur, Venuše, Země a Mars","Jupiter a Saturn","Uran a Neptun","Všechny"]],
+      ["Vesmír","Která planeta se otáčí skoro naležato?",["Uran","Mars","Merkur","Saturn"]],
+      ["Vesmír","Čím je dnes Pluto?",["Trpasličí planetou","Osmou planetou","Kometou","Měsícem Neptunu"]],
+      ["Vesmír","Kdo přišel s tím, že Země obíhá kolem Slunce?",["Mikuláš Koperník","Isaac Newton","Albert Einstein","Ptolemaios"]],
+      ["Vesmír","Kdo jako první pozoroval dalekohledem Jupiterovy měsíce?",["Galileo Galilei","Koperník","Kepler","Newton"]],
+      ["Vesmír","Jak dlouho trvá den na Marsu?",["Asi 24,6 hodiny","Asi 10 hodin","Asi 48 hodin","Asi rok"]],
+      ["Vesmír","Proč na Měsíci není slyšet žádný zvuk?",["Chybí tam vzduch","Je tam příliš zima","Je tam moc velké ticho","Zvuk zmrzne"]],
+      ["Vesmír","Jak se jmenuje pás kamenných těles mezi Marsem a Jupiterem?",["Pás planetek","Kuiperův prstenec","Mléčná stezka","Meteorický pás"]]
+    ],
+    tezke: [
+      ["Vesmír","Jak se jmenuje největší měsíc sluneční soustavy?",["Ganymed","Titan","Měsíc","Europa"]],
+      ["Vesmír","Jak se jmenuje největší Saturnův měsíc?",["Titan","Ganymed","Io","Rhea"]],
+      ["Vesmír","Co je supernova?",["Obrovský výbuch hvězdy","Nová planeta","Druh galaxie","Kometa s ohonem"]],
+      ["Vesmír","Jak se jmenuje jednotka, kterou se měří obrovské vzdálenosti ve vesmíru?",["Světelný rok","Kilometr čtvereční","Astronomický stupeň","Parsecund"]],
+      ["Vesmír","Jak rychle letí světlo?",["Asi 300 000 km za sekundu","Asi 300 km za sekundu","Asi 1000 km za hodinu","Asi 30 km za sekundu"]],
+      ["Vesmír","Jak daleko je přibližně Slunce od Země?",["150 milionů km","1 milion km","15 miliard km","384 tisíc km"]],
+      ["Vesmír","Jak se jmenuje velký vesmírný dalekohled vypuštěný v roce 2021?",["Jamese Webba","Hubbleův","Keplerův","Galileův"]],
+      ["Vesmír","Co popisuje teorie velkého třesku?",["Vznik vesmíru","Vznik Země","Konec Slunce","Vznik života"]],
+      ["Vesmír","Jak starý je přibližně vesmír?",["13,8 miliardy let","4,5 miliardy let","1 milion let","100 miliard let"]],
+      ["Vesmír","Jak se jmenuje sonda, která jako první opustila sluneční soustavu?",["Voyager 1","Sputnik","Apollo 13","Cassini"]],
+      ["Vesmír","Kdo byla první žena ve vesmíru?",["Valentina Těreškovová","Sally Rideová","Marie Curie","Anna Fisherová"]],
+      ["Vesmír","Kolik lidí dosud chodilo po Měsíci?",["12","2","50","0"]],
+      ["Vesmír","Jak se jmenovala raketa, která vynesla lidi k Měsíci?",["Saturn V","Sojuz","Falcon 9","Vostok"]],
+      ["Vesmír","Co se stane se Sluncem za miliardy let?",["Nafoukne se v rudého obra","Vybuchne hned","Zmizí","Změní se v planetu"]]
+    ]
+  },
+  priroda: {
+    lehke: [
+      ["Zvířata","Kolik nohou má moucha?",["6","4","8","2"]],
+      ["Zvířata","Jak se jmenuje mládě psa?",["Štěně","Kotě","Sele","Hříbě"]],
+      ["Zvířata","Jak se jmenuje mládě krávy?",["Tele","Sele","Jehně","Kolouch"]],
+      ["Zvířata","Jak se jmenuje samice jelena?",["Laň","Srna","Koza","Klisna"]],
+      ["Zvířata","Jak se jmenuje samec ovce?",["Beran","Kozel","Vepř","Kohout"]],
+      ["Zvířata","Kolik křídel má motýl?",["4","2","6","8"]],
+      ["Zvířata","Který domácí pták dělá gagá?",["Husa","Slepice","Krocan","Holub"]],
+      ["Zvířata","Co dělá kukačka se svými vejci?",["Klade je do cizích hnízd","Zahrabává je","Nese je v zobáku","Snáší je do vody"]],
+      ["Zvířata","Který pták ťuká zobákem do stromů?",["Datel","Vlaštovka","Sova","Kos"]],
+      ["Zvířata","Který pták podle pověsti nosí děti?",["Čáp","Holub","Labuť","Orel"]],
+      ["Příroda","Jak se jmenuje sladká šťáva, kterou hmyz saje z květů?",["Nektar","Míza","Med","Pyl"]],
+      ["Příroda","Co se stane s pokojovou rostlinou, když ji nikdo nezalévá?",["Uschne","Poroste rychleji","Zezelená","Rozkvete"]],
+      ["Příroda","Který strom má nápadně bílou kůru?",["Bříza","Dub","Buk","Smrk"]],
+      ["Příroda","Na kterém stromě rostou šišky?",["Na smrku","Na lípě","Na javoru","Na topolu"]],
+      ["Příroda","Který ovocný strom kvete na jaře růžově a má peckovice?",["Třešeň","Ořešák","Dub","Bez"]],
+      ["Zvířata","Které zvíře plete pavučinu?",["Pavouk","Mravenec","Včela","Brouk"]],
+      ["Zvířata","Čím se živí zajíc?",["Rostlinami","Masem","Rybami","Hmyzem"]],
+      ["Tělo","Kolik očí má člověk?",["2","1","3","4"]],
+      ["Tělo","Co si máš umýt před jídlem?",["Ruce","Vlasy","Boty","Okna"]],
+      ["Příroda","Co dělá strom v zimě, když je listnatý?",["Nemá listy a odpočívá","Roste nejrychleji","Kvete","Mění se v jehličnatý"]]
+    ],
+    stredni: [
+      ["Zvířata","Do jaké skupiny živočichů patří delfín?",["Mezi savce","Mezi ryby","Mezi obojživelníky","Mezi plazy"]],
+      ["Zvířata","Do jaké skupiny živočichů patří želva?",["Mezi plazy","Mezi obojživelníky","Mezi savce","Mezi ryby"]],
+      ["Zvířata","Do jaké skupiny patří rak?",["Mezi korýše","Mezi ryby","Mezi hmyz","Mezi měkkýše"]],
+      ["Zvířata","Z kolika částí se skládá tělo hmyzu?",["Ze tří","Ze dvou","Ze čtyř","Z jedné"]],
+      ["Zvířata","Jak se jmenuje samice divočáka?",["Bachyně","Laň","Koza","Srna"]],
+      ["Zvířata","Čím dýchá dospělá žába?",["Plícemi a kůží","Jen žábrami","Jen kůží","Ploutvemi"]],
+      ["Zvířata","Jak se říká zvířeti, které se živí zbytky uhynulých zvířat?",["Mrchožrout","Býložravec","Všežravec","Parazit"]],
+      ["Příroda","Co vzniká při fotosyntéze a my to dýcháme?",["Kyslík","Oxid uhličitý","Dusík","Vodní pára"]],
+      ["Příroda","Jak se jmenuje přenos pylu z květu na květ?",["Opylování","Klíčení","Kvašení","Dýchání"]],
+      ["Příroda","Kdo nejčastěji opyluje květy na loukách?",["Včely a jiný hmyz","Ptáci","Myši","Vítr sám"]],
+      ["Příroda","Jak se jmenuje část houby, která roste pod zemí?",["Podhoubí","Klobouk","Třeň","Kořen"]],
+      ["Příroda","Jak se jmenuje neustálé odpařování a padání vody na Zemi?",["Koloběh vody","Fotosyntéza","Eroze","Kondenzace hor"]],
+      ["Příroda","Z čeho vzniká mrak?",["Z vodní páry","Z kouře","Z prachu","Z ledu ze země"]],
+      ["Příroda","Proč se v zimě sype na silnice sůl?",["Aby led rychleji roztál","Aby silnice zbělely","Kvůli chuti","Aby se leskla"]],
+      ["Zvířata","Které zvíře žije v tundře na severu?",["Sob","Velbloud","Šimpanz","Lenochod"]],
+      ["Tělo","Kolik má člověk mléčných zubů oproti dospělému?",["Míň, jen 20","Stejně, 32","Víc, 40","Jen 10"]],
+      ["Příroda","Jak se jmenuje les, ve kterém rostou hlavně smrky a borovice?",["Jehličnatý","Listnatý","Smíšený","Tropický"]],
+      ["Zvířata","Jak se jmenuje zvíře aktivní hlavně v noci?",["Noční živočich","Denní živočich","Stěhovavý živočich","Vodní živočich"]],
+      ["Příroda","Co potřebuje semínko, aby vyklíčilo?",["Vodu, teplo a vzduch","Jen tmu","Jen hnojivo","Jen sníh"]],
+      ["Věda","Co se stane s kovem, když se zahřeje?",["Roztáhne se","Zmenší se","Ztvrdne navždy","Změní barvu na modrou"]]
+    ],
+    tezke: [
+      ["Zvířata","Jak se jmenuje savec, který nemá zuby a živí se mravenci?",["Mravenečník","Ježek","Krtek","Lenochod"]],
+      ["Příroda","Jak se jmenuje africký strom s obrovsky tlustým kmenem?",["Baobab","Palma","Eukalyptus","Akát"]],
+      ["Příroda","Jak se jmenuje nejvyšší strom na světě?",["Sekvoj","Dub","Borovice","Baobab"]],
+      ["Zvířata","Který pták letí ze všech nejrychleji?",["Sokol stěhovavý","Orel skalní","Kolibřík","Racek"]],
+      ["Zvířata","Jak se jmenuje nejmenší pták na světě?",["Kolibřík","Střízlík","Sýkora","Vlaštovka"]],
+      ["Zvířata","Jak se jmenoval nelétavý pták z ostrova Mauricius, který vyhynul?",["Blboun nejapný","Pštros","Tučňák","Kivi"]],
+      ["Zvířata","Jak se jmenuje pravěký příbuzný slona s dlouhou srstí?",["Mamut","Nosorožec","Dinosaurus","Bizon"]],
+      ["Zvířata","Před kolika lety zhruba vyhynuli dinosauři?",["Před 66 miliony let","Před 10 tisíci lety","Před miliardou let","Před 500 lety"]],
+      ["Věda","Jak se jmenuje vědec, který zkoumá zkameněliny a pravěká zvířata?",["Paleontolog","Archeolog","Geolog","Biolog"]],
+      ["Tělo","Kolik chromozomů má člověk?",["46","23","12","64"]],
+      ["Tělo","Jak se jmenuje látka v buňkách, která nese dědičnou informaci?",["DNA","Bílkovina","Vitamín","Enzym"]],
+      ["Věda","Kdo přišel s teorií o vývoji druhů?",["Charles Darwin","Gregor Mendel","Louis Pasteur","Isaac Newton"]],
+      ["Zvířata","Který jedovatý had žije volně i v Česku?",["Zmije obecná","Kobra","Chřestýš","Užovka obojková"]],
+      ["Tělo","Kolik procent lidského těla tvoří přibližně voda?",["Asi 60 %","Asi 10 %","Asi 90 %","Asi 30 %"]],
+      ["Příroda","Jak se jmenuje druh, který žije jen na jednom jediném místě na světě?",["Endemit","Migrant","Hybrid","Parazit"]],
+      ["Zvířata","Kolik váží dospělý slon africký?",["Kolem 5 tun","Kolem 500 kilo","Kolem 20 tun","Kolem 100 kilo"]],
+      ["Věda","Jak se jmenuje jev, kdy se kámen v řece za dlouhá léta obrousí do hladka?",["Eroze","Exploze","Fotosyntéza","Difuze"]],
+      ["Příroda","Která velká kočkovitá šelma žije volně v české přírodě?",["Rys ostrovid","Lev","Tygr","Puma"]],
+      ["Věda","Co měří stupnice Richterova?",["Sílu zemětřesení","Teplotu vzduchu","Rychlost větru","Hloubku moře"]],
+      ["Příroda","Jak se jmenuje horká voda, která tryská ze země?",["Gejzír","Vodopád","Pramen slaný","Ledovec"]]
+    ]
+  }
+};
+
+/* výhry jsou mocniny desítky a píšou se slovy */
+const PRIZES = ["deset","sto","tisíc","milion","miliarda","bilion","biliarda","trilion","triliarda","bambilion"];
+const SAFE = [3,7];          // jistoty: milion a trilion
+const LETTERS = ["A","B","C","D"];
+
+/* ============ POMOCNÉ ============ */
+const $ = s => document.querySelector(s);
+const shuffle = a => a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(p=>p[1]);
+const czk = w => w ? w + " korun" : "nic";
+
+/* ============ ZVUKY ============ */
+let soundOn = true, actx = null;
+function tone(freq, start, dur, type="sine", vol=0.16){
+  if(!soundOn) return;
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    o.connect(g); g.connect(actx.destination);
+    const t = actx.currentTime + start;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.start(t); o.stop(t + dur + 0.03);
+  }catch(e){}
+}
+const sfx = {
+  click: () => tone(520,0,.09,"triangle",.1),
+  lock:  () => { tone(300,0,.14,"square",.09); tone(240,.12,.2,"square",.08); },
+  right: () => [523,659,784,1047].forEach((f,i)=>tone(f,i*.09,.28,"triangle",.15)),
+  wrong: () => { tone(220,0,.3,"sawtooth",.1); tone(150,.18,.45,"sawtooth",.1); },
+  win:   () => [523,659,784,1047,1319,1047,1319].forEach((f,i)=>tone(f,i*.14,.4,"triangle",.16))
+};
+
+/* ============ STAV HRY ============ */
+let level = 0, quiz = [], used = {f:false,p:false,c:false}, locked = false;
+
+const THEMES = [
+  {id:"mix",       emoji:"🎲", name:"Všechno dohromady"},
+  {id:"minecraft", emoji:"⛏️", name:"Minecraft"},
+  {id:"pokemon",   emoji:"⚡", name:"Pokémon"},
+  {id:"gd",        emoji:"🔺", name:"Geometry Dash"},
+  {id:"skola",     emoji:"✏️", name:"Škola"},
+  {id:"pocitace",  emoji:"💻", name:"Informatika"},
+  {id:"svet",      emoji:"🌍", name:"Svět a dějiny"},
+  {id:"vesmir",    emoji:"🚀", name:"Vesmír"},
+  {id:"priroda",   emoji:"🦊", name:"Zvířata a příroda"}
+];
+const CAT2THEME = {
+  "Počítání":"skola","Tvary a míry":"skola","Jazyk":"skola","Čas":"skola",
+  "Zeměpis":"svet","Dějiny":"svet","Česko":"svet","Umění":"svet","Hudba":"svet","Sport":"svet","Povolání":"svet",
+  "Vesmír":"vesmir",
+  "Zvířata":"priroda","Příroda":"priroda","Tělo":"priroda","Věda":"priroda"
+};
+const TIERS = ["lehke","stredni","tezke"];
+
+/* zásobník otázek podle témat */
+const BANK = {};
+THEMES.forEach(t => BANK[t.id] = {lehke:[],stredni:[],tezke:[]});
+TIERS.forEach(tier => {
+  POOL[tier].forEach(q => {
+    const th = CAT2THEME[q[0]] || "svet";
+    BANK[th][tier].push(q);
+  });
+});
+[EXTRA, EXTRA2, EXTRA3].forEach(pack => Object.keys(pack).forEach(th => {
+  TIERS.forEach(tier => (pack[th][tier] || []).forEach(q => BANK[th][tier].push(q)));
+}));
+TIERS.forEach(tier => THEMES.forEach(t => {
+  if(t.id !== "mix") BANK.mix[tier] = BANK.mix[tier].concat(BANK[t.id][tier]);
+}));
+const countOf = id => TIERS.reduce((n,t) => n + BANK[id][t].length, 0);
+
+let theme = "mix";
+
+function drawThemes(){
+  const box = $("#themes"); box.innerHTML = "";
+  THEMES.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "theme";
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(t.id === theme));
+    b.innerHTML = `<em>${t.emoji}</em><span>${t.name}<small>${countOf(t.id)} otázek</small></span>`;
+    b.onclick = () => { theme = t.id; sfx.click(); drawThemes(); };
+    box.appendChild(b);
+  });
+}
+
+/* vybere 3 lehčí, 4 střední a 3 těžké; když téma nějakou úroveň nemá dost, doplní z ostatních */
+function buildQuiz(){
+  const need = {lehke:3, stredni:4, tezke:3};
+  const left = {};
+  TIERS.forEach(t => left[t] = shuffle(BANK[theme][t].slice()));
+  const picked = [];
+  TIERS.forEach(tier => {
+    for(let i = 0; i < need[tier]; i++){
+      const src = left[tier].length ? tier : TIERS.find(t => left[t].length);
+      if(!src) break;
+      picked.push(left[src].pop());
+    }
+  });
+  return picked.map(([cat,q,opts]) => {
+    const correct = opts[0];
+    const mixed = shuffle(opts);
+    return {cat, q, opts:mixed, correct:mixed.indexOf(correct)};
+  });
+}
+
+function drawLadder(){
+  const l = $("#ladder"); l.innerHTML = "";
+  PRIZES.forEach((p,i)=>{
+    const d = document.createElement("div");
+    d.className = "rung" + (SAFE.includes(i)?" safe":"") + (i<level?" done":"") + (i===level?" now":"");
+    d.textContent = p;
+    l.appendChild(d);
+  });
+  const now = l.querySelector(".now");
+  if(now) now.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+}
+
+function showQuestion(){
+  locked = false;
+  const item = quiz[level];
+  drawLadder();
+  $("#qnum").textContent = `Otázka ${level+1} z 10`;
+  $("#qcat").textContent = item.cat;
+  $("#question").textContent = item.q;
+  $("#panel").classList.add("hidden");
+  $("#panel").innerHTML = "";
+  $("#quit").textContent = level === 0
+    ? "Skončit hru"
+    : `Skončit a vzít si ${czk(PRIZES[level-1])}`;
+
+  const box = $("#answers"); box.innerHTML = "";
+  item.opts.forEach((text,i)=>{
+    const b = document.createElement("button");
+    b.className = "ans";
+    b.innerHTML = `<span class="key">${LETTERS[i]}</span><span>${text}</span>`;
+    b.onclick = () => pick(i,b);
+    box.appendChild(b);
+  });
+}
+
+function pick(i, btn){
+  if(locked) return;
+  locked = true;
+  sfx.lock();
+  btn.classList.add("picked");
+  document.querySelectorAll(".ans").forEach(b => b.disabled = true);
+  setTimeout(()=>reveal(i), 1500);
+}
+
+function reveal(i){
+  const item = quiz[level];
+  const all = [...document.querySelectorAll(".ans")];
+  all[i].classList.remove("picked");
+  all[item.correct].classList.add("right");
+  if(i !== item.correct) all[i].classList.add("wrong");
+
+  if(i === item.correct){
+    level++;
+    if(level === PRIZES.length){ sfx.win(); confetti(); setTimeout(()=>finish("win"),1400); }
+    else { sfx.right(); setTimeout(showQuestion, 1500); }
+  } else {
+    sfx.wrong();
+    setTimeout(()=>finish("lose"), 2200);
+  }
+}
+
+function safeAmount(){
+  let win = null;
+  SAFE.forEach(s => { if(level > s) win = PRIZES[s]; });
+  return win;
+}
+
+function finish(how){
+  $("#screen-game").classList.add("hidden");
+  $("#screen-end").classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+
+  if(how === "win"){
+    $("#face").textContent = "🏆";
+    $("#endtitle").textContent = "Jsi bambilionář!";
+    $("#endmoney").textContent = czk("bambilion");
+    $("#endtext").textContent = "Deset otázek z deseti a bambilion korun v kapse! To je fakt hlava. Zkusíš to znovu s jinými otázkami?";
+  } else if(how === "quit"){
+    const amt = level > 0 ? PRIZES[level-1] : null;
+    $("#face").textContent = "🤝";
+    $("#endtitle").textContent = "Odnášíš si výhru";
+    $("#endmoney").textContent = czk(amt);
+    $("#endtext").textContent = `Zvládl*a jsi ${level} ${level===1?"otázku":level<5?"otázky":"otázek"} a včas ses zastavil*a. Chytrý tah!`;
+  } else {
+    const amt = safeAmount();
+    $("#face").textContent = amt ? "😊" : "🙂";
+    $("#endtitle").textContent = "Konec hry";
+    $("#endmoney").textContent = czk(amt);
+    $("#endtext").textContent = amt
+      ? `Správně jsi odpověděl*a na ${level} ${level<5?"otázky":"otázek"}. Díky jistotě si odnášíš ${czk(amt)}. Příště to bude ještě lepší!`
+      : `Správně jsi odpověděl*a na ${level} ${level===1?"otázku":level<5?"otázky":"otázek"}. Nevadí — každá hra tě něco nového naučí. Dej si ještě jednu!`;
+  }
+}
+
+/* ============ NÁPOVĚDY ============ */
+$("#h5050").onclick = () => {
+  if(locked) return;
+  used.f = true; $("#h5050").disabled = true; sfx.click();
+  const item = quiz[level];
+  const wrong = shuffle([0,1,2,3].filter(i => i !== item.correct)).slice(0,2);
+  const all = [...document.querySelectorAll(".ans")];
+  wrong.forEach(i => { all[i].classList.add("gone"); all[i].disabled = true; });
+};
+
+$("#hpub").onclick = () => {
+  if(locked) return;
+  used.p = true; $("#hpub").disabled = true; sfx.click();
+  const item = quiz[level];
+  const alive = [...document.querySelectorAll(".ans")].map((b,i)=>({b,i})).filter(x=>!x.b.classList.contains("gone"));
+  let left = 100, votes = [0,0,0,0];
+  const good = 52 + Math.floor(Math.random()*26);
+  votes[item.correct] = good; left -= good;
+  const others = alive.filter(x => x.i !== item.correct).map(x => x.i);
+  others.forEach((idx,n) => {
+    const v = (n === others.length-1) ? left : Math.floor(Math.random()*(left-(others.length-1-n)));
+    votes[idx] = v; left -= v;
+  });
+  const p = $("#panel");
+  p.classList.remove("hidden");
+  p.innerHTML = `<h3>Takhle hlasovaly děti v publiku</h3><div class="bars">` +
+    votes.map((v,i) => alive.some(a=>a.i===i)
+      ? `<div class="bar"><b>${v} %</b><i style="height:${Math.max(v,3)}%"></i><u>${LETTERS[i]}</u></div>`
+      : `<div class="bar"><b>—</b><i style="height:3%;opacity:.25"></i><u>${LETTERS[i]}</u></div>`).join("") +
+    `</div>`;
+};
+
+$("#hcall").onclick = () => {
+  if(locked) return;
+  used.c = true; $("#hcall").disabled = true; sfx.click();
+  const item = quiz[level];
+  const alive = [...document.querySelectorAll(".ans")].map((b,i)=>i)
+    .filter(i => !document.querySelectorAll(".ans")[i].classList.contains("gone"));
+  const sure = Math.random() < 0.8;
+  const tip = sure ? item.correct : shuffle(alive.filter(i=>i!==item.correct))[0] ?? item.correct;
+  const text = sure
+    ? `Ahoj broučku! Tuhle znám — je to <b>${LETTERS[tip]}</b>. Za to ti ručím.`
+    : `Ahoj broučku! Hádala bych <b>${LETTERS[tip]}</b>, ale úplně jistá si nejsem. Rozmysli si to.`;
+  const p = $("#panel");
+  p.classList.remove("hidden");
+  p.innerHTML = `<h3>📞 Babička je na drátě</h3><div>${text}</div>`;
+};
+
+/* ============ KONFETY ============ */
+function confetti(){
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box = document.createElement("div");
+  box.className = "confetti";
+  const colors = ["#FFC93C","#FF5C6E","#35D9A0","#4FC3F7","#FFF3DC"];
+  for(let i=0;i<70;i++){
+    const c = document.createElement("i");
+    c.style.left = Math.random()*100 + "vw";
+    c.style.top = (-12 - Math.random()*35) + "vh";
+    c.style.background = colors[i%colors.length];
+    c.style.animationDuration = (2.2 + Math.random()*1.8) + "s";
+    c.style.animationDelay = (Math.random()*0.7) + "s";
+    box.appendChild(c);
+  }
+  document.body.appendChild(box);
+  setTimeout(()=>box.remove(), 5200);
+}
+
+/* ============ OVLÁDÁNÍ ============ */
+function newGame(){
+  level = 0; used = {f:false,p:false,c:false};
+  const t = THEMES.find(x => x.id === theme);
+  $("#themetag").textContent = `${t.emoji} ${t.name}`;
+  quiz = buildQuiz();
+  ["#h5050","#hpub","#hcall"].forEach(s => $(s).disabled = false);
+  $("#screen-start").classList.add("hidden");
+  $("#screen-end").classList.add("hidden");
+  $("#screen-game").classList.remove("hidden");
+  showQuestion();
+}
+$("#start").onclick = () => { sfx.click(); newGame(); };
+$("#again").onclick = () => { sfx.click(); newGame(); };
+$("#rethemebtn").onclick = () => {
+  sfx.click(); drawThemes();
+  $("#screen-end").classList.add("hidden");
+  $("#screen-game").classList.add("hidden");
+  $("#screen-start").classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+};
+drawThemes();
+$("#quit").onclick = () => { if(!locked){ sfx.click(); finish("quit"); } };
+$("#sound").onclick = e => {
+  soundOn = !soundOn;
+  e.currentTarget.textContent = soundOn ? "🔊" : "🔇";
+  e.currentTarget.setAttribute("aria-label", soundOn ? "Zvuk zapnutý" : "Zvuk vypnutý");
+};
+document.addEventListener("keydown", e => {
+  const k = e.key.toUpperCase();
+  if(["A","B","C","D"].includes(k) && !$("#screen-game").classList.contains("hidden")){
+    const b = document.querySelectorAll(".ans")[LETTERS.indexOf(k)];
+    if(b && !b.disabled) b.click();
+  }
+});
+</script>
+</body>
+</html>
