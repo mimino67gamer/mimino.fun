@@ -1,0 +1,103 @@
+{
+  "games": [
+    {
+      "slug": "blockvale",
+      "title": "Blockvale",
+      "subtitle": "2D block sandbox",
+      "description": "TODO",
+      "tags": ["sandbox"],
+      "lang": "en",
+      "file": "games/blockvale.html",
+      "thumb": "assets/thumbs/blockvale.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "bring-it-down",
+      "title": "Bring It Down",
+      "subtitle": "controlled demolition",
+      "description": "TODO",
+      "tags": ["physics", "puzzle"],
+      "lang": "en",
+      "file": "games/bring-it-down.html",
+      "thumb": "assets/thumbs/bring-it-down.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "sunder",
+      "title": "Sunder",
+      "subtitle": "a duel of hollow knights",
+      "description": "TODO",
+      "tags": ["action"],
+      "lang": "en",
+      "file": "games/sunder.html",
+      "thumb": "assets/thumbs/sunder.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "flappy-dash",
+      "title": "Flappy Dash",
+      "subtitle": "",
+      "description": "TODO",
+      "tags": ["arcade"],
+      "lang": "en",
+      "file": "games/flappy-dash.html",
+      "thumb": "assets/thumbs/flappy-dash.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "galactus",
+      "title": "Galactus",
+      "subtitle": "",
+      "description": "TODO",
+      "tags": ["arcade"],
+      "lang": "en",
+      "file": "games/galactus.html",
+      "thumb": "assets/thumbs/galactus.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "vlna",
+      "title": "VLNA",
+      "subtitle": "1000 levelů",
+      "description": "TODO",
+      "tags": ["arcade"],
+      "lang": "cs",
+      "file": "games/vlna.html",
+      "thumb": "assets/thumbs/vlna.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "mala-velka-armada",
+      "title": "Malá velká armáda",
+      "subtitle": "",
+      "description": "TODO",
+      "tags": ["strategy"],
+      "lang": "cs",
+      "file": "games/mala-velka-armada.html",
+      "thumb": "assets/thumbs/mala-velka-armada.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "bambilionar",
+      "title": "Chcete být Bambilionářem?",
+      "subtitle": "kvíz pro děti",
+      "description": "TODO",
+      "tags": ["quiz", "kids"],
+      "lang": "cs",
+      "file": "games/bambilionar.html",
+      "thumb": "assets/thumbs/bambilionar.png",
+      "added": "2026-09-11"
+    },
+    {
+      "slug": "tajna-zprava",
+      "title": "Tajná zpráva",
+      "subtitle": "rozlušti pohádku",
+      "description": "TODO",
+      "tags": ["puzzle", "kids"],
+      "lang": "cs",
+      "file": "games/tajna-zprava.html",
+      "thumb": "assets/thumbs/tajna-zprava.png",
+      "added": "2026-09-11"
+    }
+  ]
+}
