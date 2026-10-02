@@ -71,6 +71,8 @@
 <script>
 // Add a game = append one object here.
 const GAMES = [
+  { slug:"kostkopad", title:"Kostkopád 3D", lang:"CS", tags:["Arkáda","300 levelů"],
+    desc:"Hebká kostka padá nekonečnou trubkou — proleť dírou, obleť křížek a drž mezerník pro warp. Kampaň s 300 levely a 200 skinů za coiny." },
   { slug:"blockvale", title:"Blockvale", lang:"EN", tags:["Sandbox","Crafting"],
     desc:"Mine, craft and build a 2D world grown from a seed. Survival has hunger and mobs; Creative lets you fly and build with everything." },
   { slug:"bring-it-down", title:"Bring It Down", lang:"EN", tags:["Physics","Puzzle"],
@@ -88,9 +90,7 @@ const GAMES = [
   { slug:"bambilionar", title:"Chcete být Bambilionářem?", lang:"CS", tags:["Kvíz","Pro děti"],
     desc:"Deset otázek, které pořádně zaberou. Tři nápovědy, jistota po milionu — a na konci celý bambilion." },
   { slug:"tajna-zprava", title:"Tajná zpráva", lang:"CS", tags:["Šifry","Pohádka"],
-    desc:"Agent Ježek zašifroval pohádku — každé písmenko vyměnil za jiné. Dostaň z toho zpátky češtinu." },
-  { slug:"kostkopad", title:"Kostkopád 3D", lang:"CS", tags:["Arkáda","300 levelů"],
-    desc:"Hebká kostka padá nekonečnou trubkou — proleť dírou, obleť křížek a drž mezerník pro warp. Kampaň s 300 levely a 200 skinů za coiny." }
+    desc:"Agent Ježek zašifroval pohádku — každé písmenko vyměnil za jiné. Dostaň z toho zpátky češtinu." }
 ];
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
