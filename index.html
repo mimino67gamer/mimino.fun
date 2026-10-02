@@ -71,6 +71,8 @@
 <script>
 // Add a game = append one object here.
 const GAMES = [
+  { slug:"money-tycoon", title:"Money Tycoon", lang:"CS", tags:["Budovatelská","Minihry"],
+    desc:"Vybuduj peněžní impérium z dvaceti miniher — kuličky, důl, šachy, bedny, krokodýl zubař i jumpscare za dveřmi. Ekonomika je schválně skoro nemožně těžká." },
   { slug:"kostkopad", title:"Kostkopád 3D", lang:"CS", tags:["Arkáda","300 levelů"],
     desc:"Hebká kostka padá nekonečnou trubkou — proleť dírou, obleť křížek a drž mezerník pro warp. Kampaň s 300 levely a 200 skinů za coiny." },
   { slug:"blockvale", title:"Blockvale", lang:"EN", tags:["Sandbox","Crafting"],
@@ -90,9 +92,7 @@ const GAMES = [
   { slug:"bambilionar", title:"Chcete být Bambilionářem?", lang:"CS", tags:["Kvíz","Pro děti"],
     desc:"Deset otázek, které pořádně zaberou. Tři nápovědy, jistota po milionu — a na konci celý bambilion." },
   { slug:"tajna-zprava", title:"Tajná zpráva", lang:"CS", tags:["Šifry","Pohádka"],
-    desc:"Agent Ježek zašifroval pohádku — každé písmenko vyměnil za jiné. Dostaň z toho zpátky češtinu." },
-  { slug:"money-tycoon", title:"Money Tycoon", lang:"CS", tags:["Budovatelská","Minihry"],
-    desc:"Vybuduj peněžní impérium z dvaceti miniher — kuličky, důl, šachy, bedny, krokodýl zubař i jumpscare za dveřmi. Ekonomika je schválně skoro nemožně těžká." }
+    desc:"Agent Ježek zašifroval pohádku — každé písmenko vyměnil za jiné. Dostaň z toho zpátky češtinu." }
 ];
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
